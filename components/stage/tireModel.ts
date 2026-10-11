@@ -172,9 +172,10 @@ const zig = (period: number, amp: number) => (u: number) => {
 };
 
 // ------------------------------------------------------------------ tread patterns
-function treadGeometry(kind: TireKind) {
-  const depth = DEPTH[kind];
-  const R0 = DIM.RO - depth;
+function treadGeometry(kind: TireKind, wear = 1) {
+  // a worn tire keeps its casing (R0) and loses tread height
+  const R0 = DIM.RO - DEPTH[kind];
+  const depth = DEPTH[kind] * wear;
   const C = 2 * Math.PI * R0;
   const soup: Soup = [];
   const { A, RHO } = DIM;
@@ -308,7 +309,7 @@ function stippleTile() {
   return stipple;
 }
 
-function sidewallTexture(outPts: THREE.Vector2[], length: number, kind: TireKind, font: string, maxSize: number) {
+function sidewallTexture(outPts: THREE.Vector2[], length: number, kind: TireKind, font: string, maxSize: number, brand = false) {
   const W = Math.min(4096, maxSize), H = W / 4;
   const cv = document.createElement("canvas");
   cv.width = W;
@@ -369,11 +370,19 @@ function sidewallTexture(outPts: THREE.Vector2[], length: number, kind: TireKind
   for (const off of [0, 0.5]) {
     const u = 0.25 + off;
     label("295/75R22.5", 0.405, u % 1, 0.034);
-    label("LOAD RANGE G", 0.37, (u + 0.115) % 1, 0.014, 700);
+    label(brand ? "LOAD RANGE H" : "LOAD RANGE G", 0.37, (u + 0.115) % 1, 0.014, 700);
     label("TUBELESS", 0.37, (u - 0.11 + 1) % 1, 0.014, 700);
     label("STEEL BELTED RADIAL", 0.44, u % 1, 0.013, 700);
     label(kind === "drive" ? "M+S" : "REGROOVABLE", 0.44, (u + 0.16) % 1, 0.012, 700);
     label("DOT  TT4R  2026", 0.355, (u + 0.28) % 1, 0.011, 700);
+  }
+  // the shop's own brand, between the size markings, upright at the top when the tire hasn't rolled
+  if (brand) {
+    for (const u of [0, 0.5]) {
+      label("TTP TIRE", 0.408, u, 0.052, 900);
+      label("18 PLY RATING", 0.358, u, 0.014, 700);
+      label("MADE IN MALAYSIA", 0.448, u, 0.012, 700);
+    }
   }
   const tex = new THREE.CanvasTexture(cv);
   tex.wrapS = THREE.RepeatWrapping;
@@ -381,6 +390,99 @@ function sidewallTexture(outPts: THREE.Vector2[], length: number, kind: TireKind
   tex.colorSpace = THREE.NoColorSpace;
   tex.anisotropy = 8;
   return tex;
+}
+
+// tire-crayon marks on a used tire's sidewall: the tread depth a tech wrote on it after
+// inspecting it. A color map laid out like the bump map (same profile coordinates).
+function sidewallCrayon(outPts: THREE.Vector2[], length: number, font: string, maxSize: number) {
+  const W = Math.min(4096, maxSize), H = W / 4;
+  const cv = document.createElement("canvas");
+  cv.width = W;
+  cv.height = H;
+  const ctx = cv.getContext("2d")!;
+  ctx.fillStyle = "#121212"; // the sidewall's own rubber color, so only the marks show
+  ctx.fillRect(0, 0, W, H);
+  const lens = [0];
+  for (let j = 1; j < outPts.length; j++) lens.push(lens[j - 1] + outPts[j].distanceTo(outPts[j - 1]));
+  const sAt = (r: number) => {
+    for (let j = 1; j < outPts.length; j++) {
+      const a = outPts[j - 1], b = outPts[j];
+      if ((r - a.x) * (r - b.x) <= 0) return lens[j - 1] + ((r - a.x) / (b.x - a.x || 1)) * (lens[j] - lens[j - 1]);
+    }
+    return r < outPts[0].x ? 0 : length;
+  };
+  const mark = (text: string, r: number, u: number, sizeM: number, tilt: number) => {
+    const mx = (2 * Math.PI * r) / W, my = length / H;
+    ctx.save();
+    ctx.translate(u * W, (sAt(r) / length) * H);
+    ctx.scale(my / mx, 1);
+    ctx.scale(-1, -1);
+    ctx.rotate(tilt);
+    ctx.font = `italic 700 ${sizeM / my}px ${font}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    // several faint, slightly offset passes read as waxy crayon rather than print
+    ctx.fillStyle = "#efe6c4";
+    for (let i = 0; i < 7; i++) {
+      ctx.globalAlpha = 0.32;
+      ctx.fillText(text, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3);
+    }
+    ctx.restore();
+  };
+  mark("12/32", 0.425, 0.43, 0.036, -0.08);
+  mark("OK", 0.37, 0.47, 0.026, 0.05);
+  // gaps where the crayon skipped over the rubber's texture
+  ctx.globalCompositeOperation = "source-atop";
+  ctx.fillStyle = "#121212";
+  for (let i = 0; i < W * 3; i++) ctx.fillRect(Math.random() * W, Math.random() * H, 1.5, 1.5);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = THREE.RepeatWrapping;
+  t.flipY = false;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+// a repair plug in the tread, frayed where it was trimmed, with the tech's crayon circle round it
+function plugParts(R: number, theta: number, v: number) {
+  const radial = new THREE.Vector3(Math.sin(theta), 0, Math.cos(theta));
+  const align = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
+  const at = (r: number) => radial.clone().multiplyScalar(r).add(new THREE.Vector3(0, v, 0));
+  const plug = new THREE.CylinderGeometry(0.0034, 0.0036, 0.016, 16, 1).applyQuaternion(align).translate(...at(R - 0.004).toArray());
+  const tips: THREE.BufferGeometry[] = [plug];
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const tip = new THREE.ConeGeometry(0.0011, 0.006, 5)
+      .rotateX(0.5 + Math.random() * 0.4)
+      .rotateY(a)
+      .translate(Math.cos(a) * 0.0018, 0.0035, Math.sin(a) * 0.0018)
+      .applyQuaternion(align)
+      .translate(...at(R + 0.002).toArray());
+    tips.push(tip);
+  }
+  const ring = new THREE.TorusGeometry(0.021, 0.0012, 6, 48)
+    .rotateX(Math.PI / 2) // into the tangent plane at the top of the tire
+    .applyQuaternion(align)
+    .translate(...at(R + 0.0006).toArray());
+  return { plug: mergeGeometries(tips.map((g) => (g.index ? g.toNonIndexed() : g)))!, ring };
+}
+
+// clip-on balance weights on the outboard rim flange, truck sized (about 7 and 5 cm long)
+function weightParts(theta: number) {
+  const parts: THREE.BufferGeometry[] = [];
+  for (const [dt, len] of [[0, 0.07], [0.24, 0.05]] as const) {
+    const a = theta + dt;
+    const body = new THREE.BoxGeometry(len, 0.015, 0.011);
+    const clip = new THREE.BoxGeometry(0.013, 0.005, 0.017).translate(0, 0.011, -0.005);
+    for (const g of [body, clip]) {
+      // local x along the rim, y outward, z along the axle; then place on the flange
+      g.rotateX(-Math.PI / 2);
+      g.rotateY(a + Math.PI / 2);
+      g.translate(0.288 * Math.sin(a), 0.122, 0.288 * Math.cos(a));
+      parts.push(g.toNonIndexed());
+    }
+  }
+  return mergeGeometries(parts)!;
 }
 
 // ------------------------------------------------------------------ wheel
@@ -480,8 +582,14 @@ export function makeMaterials() {
     rubber: new THREE.MeshStandardMaterial({ ...rubber }),
     groove: new THREE.MeshStandardMaterial({ ...rubber, color: 0x0c0c0c, roughness: 0.9 }),
     treadRubber: new THREE.MeshStandardMaterial({ ...rubber, color: 0x0e0e0e, vertexColors: true, roughness: 0.92, bumpMap: grain, bumpScale: 0.12 }),
-    sidewall: (bump: THREE.Texture) =>
-      new THREE.MeshStandardMaterial({ ...rubber, color: 0x121212, roughness: 0.62, bumpMap: bump, bumpScale: 6 }),
+    sidewall: (bump: THREE.Texture, map?: THREE.Texture) =>
+      new THREE.MeshStandardMaterial({ ...rubber, color: map ? 0xffffff : 0x121212, map, roughness: 0.62, bumpMap: bump, bumpScale: 6 }),
+    // worn tread: drier, scuffed rubber
+    wornTread: new THREE.MeshStandardMaterial({ ...rubber, color: 0x171615, vertexColors: true, roughness: 0.97, bumpMap: grain, bumpScale: 0.2 }),
+    plug: new THREE.MeshStandardMaterial({ color: 0x2b2018, roughness: 0.85, envMapIntensity: 0.3 }),
+    crayon: new THREE.MeshStandardMaterial({ color: 0xe9d46a, roughness: 0.95, envMapIntensity: 0.4 }),
+    // dull zinc, so the weights stand out against the polished rim
+    weight: new THREE.MeshStandardMaterial({ color: 0x5f6266, metalness: 0.6, roughness: 0.5, envMapIntensity: 1 }),
     aluminum: new THREE.MeshStandardMaterial({ color: 0xdcdcdc, metalness: 1, roughness: 0.2, envMapIntensity: 1.3 }),
     chrome: new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.08, envMapIntensity: 1.4 }),
     hub: new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.6, roughness: 0.4 }),
@@ -490,14 +598,30 @@ export function makeMaterials() {
 }
 
 // ------------------------------------------------------------------ assembly
-export function makeTire(kind: TireKind, materials: TireMaterials, opts: { font: string; maxTexture: number }) {
+export type TireOptions = {
+  font: string;
+  maxTexture: number;
+  worn?: boolean; // a used tire: shallower tread, scuffed rubber, crayon marks
+  plug?: boolean; // a repaired puncture
+  weights?: boolean; // balance weights on the rim
+  brand?: boolean; // the shop's own TTP Tire lettering on the sidewall
+};
+
+/** Tread lost on a worn tire, as a fraction of new depth. */
+const WORN = 0.55;
+
+export function makeTire(kind: TireKind, materials: TireMaterials, opts: TireOptions) {
   const group = new THREE.Group();
   group.name = `tire-${kind}`;
   const body = carcass(kind);
   const w = wheelGeometry();
-  const side = materials.sidewall(sidewallTexture(body.outPts, body.outerLength, kind, opts.font, opts.maxTexture));
+  const bump = sidewallTexture(body.outPts, body.outerLength, kind, opts.font, opts.maxTexture, opts.brand);
+  const side = opts.worn
+    ? materials.sidewall(bump, sidewallCrayon(body.outPts, body.outerLength, opts.font, opts.maxTexture))
+    : materials.sidewall(bump);
+  const wear = opts.worn ? WORN : 1;
   const meshes = [
-    new THREE.Mesh(treadGeometry(kind), materials.treadRubber),
+    new THREE.Mesh(treadGeometry(kind, wear), opts.worn ? materials.wornTread : materials.treadRubber),
     new THREE.Mesh(body.crown, materials.groove),
     new THREE.Mesh(body.outer, side),
     new THREE.Mesh(body.inner, materials.rubber),
@@ -515,6 +639,12 @@ export function makeTire(kind: TireKind, materials: TireMaterials, opts: { font:
   // the tire rolls inside this group, so rolling and presentation turns don't interfere
   const spin = new THREE.Group();
   spin.add(...meshes, backing);
+  if (opts.plug) {
+    const p = plugParts(DIM.RO - DEPTH[kind] * (1 - wear), Math.PI, 0.0175);
+    spin.add(new THREE.Mesh(p.plug, materials.plug), new THREE.Mesh(p.ring, materials.crayon));
+  }
+  if (opts.weights) spin.add(new THREE.Mesh(weightParts(Math.PI * 0.82), materials.weight));
   group.add(spin);
-  return { group, spin };
+  // a worn tire is a little smaller, so it sits that much lower to touch the floor
+  return { group, spin, radius: DIM.RO - DEPTH[kind] * (1 - wear) };
 }

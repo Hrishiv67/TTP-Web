@@ -1,12 +1,13 @@
 /**
- * The studio and the camera move for the tire sequence. Scroll progress p (0 to 1
- * through the pinned section) drives everything: camera, each tire's turn and roll,
- * and which tire is lit. Text timing lives in stageTimeline.ts so the server can
- * render the copy without loading three.js.
+ * The 3D showroom in the hero: three tires in a black studio. Tapping a service
+ * tweens the camera, the tires' turn and roll, and the light to that stop
+ * (stageStates.ts). The frame is composed exactly like the poster images, scaled the
+ * way CSS object-fit: cover scales them, so the swap from poster to live canvas is
+ * seamless.
  */
 import * as THREE from "three";
-import { DIM, makeMaterials, makeTire, type TireKind } from "./tireModel";
-import { KINDS, TIMELINE, TIRE_X, type Key } from "./stageTimeline";
+import { makeMaterials, makeTire } from "./tireModel";
+import { LINEUP, STOPS, TIRES, type Shot, type StopId, type TireId, type Vec3 } from "./stageStates";
 
 // Studio lighting baked into an environment map: an overhead softbox, two tall strip
 // boxes behind the subject, cards in front, and a dim wall all round, brightest at eye
@@ -92,22 +93,71 @@ const contactTexture = () =>
 
 const smootherstep = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
+const lerp3 = (a: Vec3, b: Vec3, t: number): Vec3 => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+const lerpRec = (a: Record<TireId, number>, b: Record<TireId, number>, t: number) =>
+  Object.fromEntries(TIRES.map((k) => [k, lerp(a[k], b[k], t)])) as Record<TireId, number>;
 
-function sample(p: number): { a: Key; b: Key; t: number } {
-  p = Math.min(1, Math.max(0, p));
-  let i = 0;
-  while (i < TIMELINE.length - 2 && p > TIMELINE[i + 1].p) i++;
-  const a = TIMELINE[i], b = TIMELINE[i + 1];
-  return { a, b, t: smootherstep(Math.min(1, Math.max(0, (p - a.p) / (b.p - a.p || 1)))) };
+/**
+ * Screen shapes the posters are rendered for (width / height). The live frame is
+ * composed for the matching one, then scaled like object-fit: cover.
+ */
+export const POSTER_ASPECT = { wide: 1.6, mid: 0.75, tall: 390 / 844 };
+export const posterRegime = (aspect: number) => (aspect > 1.2 ? "wide" : aspect > 0.6 ? "mid" : "tall");
+
+/** A shot worked out for one poster shape. */
+type View = {
+  cam: Vec3;
+  tgt: Vec3;
+  fov: number;
+  shift: number;
+  lift: number;
+  yaw: Record<TireId, number>;
+  roll: Record<TireId, number>;
+  light: Record<TireId, number>;
+};
+
+function resolve(v: Shot, ref: number): View {
+  const portrait = ref < 0.9;
+  // narrow shapes pull back so the subject keeps its width, more for wide subjects...
+  const tall = clamp01((1 - ref) / 0.5);
+  const fit = (ref < 1.2 ? Math.min(2.1, 1 + (1.2 - ref) * 1.15) : 1) * (1 + (v.frame.backTall - 1) * tall);
+  let cam = lerp3(v.tgt, v.cam, fit), tgt = v.tgt, fov = v.fov, yaw = v.yaw;
+  // ...unless the shot has its own framing for tall screens, which takes over as the shape narrows
+  if (v.tall && portrait) {
+    const k = clamp01((1.2 - ref) / (1.2 - POSTER_ASPECT.tall));
+    const t = v.tall;
+    cam = lerp3(cam, t.cam, k);
+    tgt = lerp3(tgt, t.tgt, k);
+    fov = lerp(fov, t.fov, k);
+    yaw = Object.fromEntries(TIRES.map((id) => [id, lerp(v.yaw[id], t.yaw?.[id] ?? v.yaw[id], k)])) as Record<TireId, number>;
+  }
+  return { cam, tgt, fov, shift: portrait ? 0 : v.frame.shift, lift: portrait ? v.frame.liftTall : v.frame.lift, yaw, roll: v.roll, light: v.light };
 }
 
+function mix(a: View, b: View, t: number): View {
+  return {
+    cam: lerp3(a.cam, b.cam, t),
+    tgt: lerp3(a.tgt, b.tgt, t),
+    fov: lerp(a.fov, b.fov, t),
+    shift: lerp(a.shift, b.shift, t),
+    lift: lerp(a.lift, b.lift, t),
+    yaw: lerpRec(a.yaw, b.yaw, t),
+    roll: lerpRec(a.roll, b.roll, t),
+    light: lerpRec(a.light, b.light, t),
+  };
+}
+
+const TWEEN_MS = 1500;
+const SPIN_RATE = 0.9; // radians per second while a stop keeps a tire turning
+const TAU = Math.PI * 2;
 const nextTask = () => new Promise<void>((r) => setTimeout(r, 0));
 
 export type TireScene = Awaited<ReturnType<typeof createTireScene>>;
 
 export async function createTireScene(
   canvas: HTMLCanvasElement,
-  { pixelRatio, small, font }: { pixelRatio: number; small: boolean; font: string },
+  { pixelRatio, small, font, start = "all" }: { pixelRatio: number; small: boolean; font: string; start?: StopId },
 ) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(pixelRatio);
@@ -121,7 +171,7 @@ export async function createTireScene(
   const envTarget = studioEnvironment(renderer);
   scene.environment = envTarget.texture;
 
-  const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 60);
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.02, 60);
 
   const floor = new THREE.Mesh(
     new THREE.CircleGeometry(7, 96).rotateX(-Math.PI / 2),
@@ -132,7 +182,7 @@ export async function createTireScene(
   floor.receiveShadow = true;
   scene.add(floor);
 
-  // key: high, front left
+  // key: high, front left; it follows the tire in focus
   const key = new THREE.SpotLight(0xfff4e8, 240, 0, 0.32, 1, 2);
   key.position.set(-3.2, 5.6, 4.2);
   key.target.position.set(0, 0.4, 0);
@@ -157,16 +207,20 @@ export async function createTireScene(
   });
 
   // one tire per task, so building them never blocks the page for long
-  const tires = {} as Record<TireKind, { pivot: THREE.Group; spin: THREE.Group; uLight: { value: number } }>;
-  for (const kind of KINDS) {
+  const tires = {} as Record<TireId, { pivot: THREE.Group; spin: THREE.Group; uLight: { value: number }; x: number }>;
+  for (const id of TIRES) {
     await nextTask();
-    const { group, spin } = makeTire(kind, makeMaterials(), { font, maxTexture: small ? 2048 : 4096 });
+    const spec = LINEUP[id];
+    const { group, spin, radius } = makeTire(spec.kind, makeMaterials(), {
+      font, maxTexture: small ? 2048 : 4096, worn: spec.worn, plug: spec.plug, weights: spec.weights, brand: spec.brand,
+    });
     group.rotation.x = Math.PI / 2; // axle toward +Z before the yaw
+    group.position.y = radius;
     const pivot = new THREE.Group();
     pivot.add(group);
-    pivot.position.set(TIRE_X[kind], DIM.RO, 0);
+    pivot.position.set(spec.x, 0, 0);
     const contact = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.5).rotateX(-Math.PI / 2), contactMat);
-    contact.position.y = -DIM.RO + 0.002;
+    contact.position.y = 0.002;
     contact.renderOrder = 1;
     pivot.add(contact);
     scene.add(pivot);
@@ -186,88 +240,128 @@ export async function createTireScene(
       };
       m.customProgramCacheKey = () => "dimmable";
     });
-    tires[kind] = { pivot, spin, uLight };
+    tires[id] = { pivot, spin, uLight, x: spec.x };
   }
 
-  const state = { target: 0, current: 0, w: 1, h: 1, dirty: true };
-  const camPos = new THREE.Vector3(), camTgt = new THREE.Vector3();
+  const view = { w: 1, h: 1 };
+  let shown: Shot = STOPS[start]; // the stop on screen, or being moved to
+  let target: StopId = start;
+  let tween: { from: View; t0: number } | null = null;
+  let arrived = performance.now();
+  let spinAngle = 0;
+  let dirty = true;
+  const camTgt = new THREE.Vector3();
+  const ref = () => POSTER_ASPECT[posterRegime(view.w / view.h)];
 
-  function apply(p: number) {
-    const { a, b, t } = sample(p);
-    camPos.set(lerp(a.cam[0], b.cam[0], t), lerp(a.cam[1], b.cam[1], t), lerp(a.cam[2], b.cam[2], t));
-    camTgt.set(lerp(a.tgt[0], b.tgt[0], t), lerp(a.tgt[1], b.tgt[1], t), lerp(a.tgt[2], b.tgt[2], t));
-    const aspect = state.w / state.h;
-    const portrait = aspect < 0.9;
-    // narrow screens: pull back so the subject keeps its width, more for wide subjects
-    const tall = Math.min(1, Math.max(0, (1 - aspect) / 0.5));
-    const fit = (aspect < 1.2 ? Math.min(2.1, 1 + (1.2 - aspect) * 1.15) : 1) * (1 + (lerp(a.backTall, b.backTall, t) - 1) * tall);
-    camPos.sub(camTgt).multiplyScalar(fit).add(camTgt);
-    camera.position.copy(camPos);
-    camera.fov = lerp(a.fov, b.fov, t);
+  function apply(v: View, spinBy: Partial<Record<TireId, number>>) {
+    const aspect = view.w / view.h;
+    const r = ref();
+    camTgt.set(...v.tgt);
+    camera.position.set(...v.cam);
     camera.lookAt(camTgt);
-    // move the subject within the frame to leave room for the text
-    const shiftX = portrait ? 0 : lerp(a.shift, b.shift, t);
-    const lift = portrait ? lerp(a.liftTall, b.liftTall, t) : lerp(a.lift, b.lift, t);
-    camera.setViewOffset(state.w, state.h, -shiftX * state.w, lift * state.h, state.w, state.h);
-    let lit = 0, litX = 0;
-    for (const kind of KINDS) {
-      const tr = tires[kind];
-      const l = lerp(a.light[kind], b.light[kind], t);
-      tr.pivot.rotation.y = lerp(a.yaw[kind], b.yaw[kind], t);
-      tr.uLight.value = l;
-      // and backs away into the dark, off the lit floor, as it dims
-      tr.pivot.position.z = -4.2 * Math.min(1, (1 - l) / 0.98);
-      tr.spin.rotation.y = -p * 2.4; // rolls with the scroll
-      lit += l;
-      litX += l * TIRE_X[kind];
+    // fill this screen the way object-fit: cover fills it with the poster
+    let fov = v.fov, shiftPx: number, liftPx: number;
+    if (aspect > r) {
+      fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(v.fov) / 2) * (r / aspect)));
+      shiftPx = v.shift * view.w;
+      liftPx = v.lift * (aspect / r) * view.h;
+    } else {
+      shiftPx = v.shift * (r / aspect) * view.w;
+      liftPx = v.lift * view.h;
     }
-    // the key light follows the tire in focus and tightens on it, so the pool of
-    // light moves with the camera and the other tires stand in the dark
-    const focusX = litX / lit;
-    const focus = Math.min(1, Math.max(0, (KINDS.length - lit) / (KINDS.length - 1)));
+    camera.fov = fov;
+    camera.setViewOffset(view.w, view.h, -shiftPx, liftPx, view.w, view.h);
+
+    let lit = 0, litX = 0;
+    for (const id of TIRES) {
+      const tr = tires[id];
+      const l = v.light[id];
+      tr.pivot.rotation.y = v.yaw[id];
+      tr.spin.rotation.y = -(v.roll[id] + (spinBy[id] ?? 0));
+      tr.uLight.value = l;
+      // a dimmed tire backs away into the dark, off the lit floor
+      tr.pivot.position.z = -4.2 * Math.min(1, (1 - l) / 0.98);
+      lit += l;
+      litX += l * tr.x;
+    }
+    // the key light follows the tire in focus and tightens on it; the rims follow too
+    const focusX = litX / Math.max(lit, 1e-3);
+    const focus = clamp01((TIRES.length - lit) / (TIRES.length - 1));
     key.position.x = -3.2 + focusX;
     key.target.position.x = focusX;
     key.angle = lerp(0.32, 0.17, focus);
     rim.target.position.x = rim2.target.position.x = focusX;
     rim2.position.x = -4.4 + focusX;
     rim.angle = rim2.angle = lerp(0.5, 0.2, focus);
-    // the right rim light drifts with the scroll, sweeping highlights over the rubber
-    rim.position.x = 3.4 + focusX + Math.sin(p * Math.PI * 6) * 1.2;
+    rim.position.x = 3.4 + focusX;
+  }
+
+  function current(now: number): { v: View; spinBy: Partial<Record<TireId, number>> } {
+    const to = resolve(shown, ref());
+    if (tween) {
+      const t = clamp01((now - tween.t0) / TWEEN_MS);
+      const v = mix(tween.from, to, smootherstep(t));
+      if (t >= 1) {
+        tween = null;
+        arrived = now;
+      }
+      return { v, spinBy: {} };
+    }
+    const spinning = STOPS[target].spin;
+    return { v: to, spinBy: spinning ? { [spinning]: spinAngle } : {} };
   }
 
   let last = performance.now();
-  return {
+  const api = {
     renderer,
-    /** Set where the scroll is; `immediate` skips the easing (for stills and the first frame). */
-    setProgress(p: number, immediate = false) {
-      state.target = p;
-      if (immediate) state.current = p;
-      state.dirty = true;
+    get stop() {
+      return target;
     },
-    get progress() {
-      return state.current;
+    /** True while something is moving and frames are needed. */
+    get animating() {
+      return dirty || tween !== null || !!STOPS[target].spin;
     },
-    /** True while the eased progress is still catching up with the scroll. */
-    get moving() {
-      return state.dirty || Math.abs(state.target - state.current) > 1e-5;
+    /** Move to a stop; `immediate` jumps there (stills, reduced motion). */
+    goTo(id: StopId, immediate = false) {
+      const now = performance.now();
+      // start from exactly what's on screen, including any spin in progress, unwound to
+      // the nearest whole turn so leaving takes the short way round
+      let from: View;
+      if (tween) from = current(now).v;
+      else {
+        from = resolve(shown, ref());
+        const spinning = STOPS[target].spin;
+        if (spinning) {
+          const to = STOPS[id].roll[spinning];
+          const off = (((from.roll[spinning] + spinAngle - to) % TAU) + TAU + Math.PI) % TAU - Math.PI;
+          from = { ...from, roll: { ...from.roll, [spinning]: to + off } };
+        }
+      }
+      spinAngle = 0;
+      target = id;
+      shown = STOPS[id];
+      tween = immediate ? null : { from, t0: now };
+      dirty = true;
     },
     resize(w: number, h: number) {
-      state.w = w;
-      state.h = h;
+      view.w = w;
+      view.h = h;
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
-      state.dirty = true;
+      dirty = true;
     },
-    /** Advance the easing and draw. Returns the eased progress the frame was drawn at. */
+    /** Draw one frame. */
     frame(now = performance.now()) {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      state.current += (state.target - state.current) * (1 - Math.exp(-dt * 7));
-      if (Math.abs(state.target - state.current) < 1e-5) state.current = state.target;
-      state.dirty = false;
-      apply(state.current);
+      if (!tween && STOPS[target].spin) {
+        // ease into the spin after arriving
+        spinAngle += SPIN_RATE * dt * Math.min(1, (now - arrived) / 1000);
+      }
+      const { v, spinBy } = current(now);
+      apply(v, spinBy);
       renderer.render(scene, camera);
-      return state.current;
+      dirty = false;
     },
     dispose() {
       scene.traverse((o) => {
@@ -281,4 +375,11 @@ export async function createTireScene(
       renderer.dispose();
     },
   };
+
+  // compile every shader before the first visible frame, so revealing the canvas
+  // doesn't stall the page
+  apply(resolve(STOPS[start], ref()), {});
+  await renderer.compileAsync(scene, camera);
+  return api;
 }
+

@@ -1,7 +1,6 @@
 /**
  * One icon family (Lucide geometry, ISC licence), one stroke weight. Icons only
- * appear where a label alone would be slower to read — the call buttons and the
- * phone action bar — never as decoration.
+ * appear on buttons, where they make the label quicker to read, never as decoration.
  */
 
 type IconProps = { size?: number; className?: string };
@@ -40,6 +39,15 @@ export function PinIcon({ size = 18, className }: IconProps) {
     <svg {...base(size)} className={className}>
       <path d="M20 10c0 4.99-5.54 10.19-7.4 11.8a1 1 0 0 1-1.2 0C9.54 20.19 4 14.99 4 10a8 8 0 0 1 16 0" />
       <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+export function CalendarIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
     </svg>
   );
 }

@@ -12,7 +12,7 @@ const F = C.fields;
 const EMPTY: QuoteRequest = {
   name: "",
   vehicle: C.vehicles[0],
-  service: ALL_SERVICES[0],
+  service: COPY.services.main[0].name,
   position: "",
   size: "",
   quantity: "",

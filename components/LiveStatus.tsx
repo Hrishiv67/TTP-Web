@@ -1,6 +1,7 @@
 "use client";
 
 import { HOURS, TIME_ZONE } from "@/lib/business";
+import { COPY } from "@/lib/copy";
 import { shopStatus } from "@/lib/hours";
 import { useNow } from "@/lib/useNow";
 
@@ -12,7 +13,7 @@ export function LiveStatus({ compact = false, className = "" }: { compact?: bool
   const now = useNow();
   const status = now === null ? null : shopStatus(HOURS, new Date(now), TIME_ZONE);
   const state = status === null ? "unknown" : status.open ? "open" : "closed";
-  const text = status === null ? (compact ? "Open weekdays 8 to 5" : "Open Monday to Friday, 8 AM to 5 PM") : compact ? status.short : status.label;
+  const text = status === null ? (compact ? COPY.hours.compact : `Open ${COPY.hours.open}`) : compact ? status.short : status.label;
 
   return (
     <p className={`status ${className}`} data-state={state}>

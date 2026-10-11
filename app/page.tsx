@@ -1,20 +1,24 @@
 import { ActionBar } from "@/components/ActionBar";
+import { BookBand } from "@/components/BookBand";
 import { Location } from "@/components/Location";
 import { Quote } from "@/components/Quote";
+import { Reveal } from "@/components/Reveal";
 import { Reviews } from "@/components/Reviews";
 import { Services } from "@/components/Services";
+import { Showroom } from "@/components/Showroom";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
-import { Sizing } from "@/components/Sizing";
-import { TireSequence } from "@/components/TireSequence";
+import { Sizes } from "@/components/Sizes";
+import { TireHelp } from "@/components/TireHelp";
+import { TtpTire } from "@/components/TtpTire";
 import { Visit } from "@/components/Visit";
 import { Who } from "@/components/Who";
 import { HOURS, REVIEWS, SECOND_LOCATION, SHOP } from "@/lib/business";
-import { ALL_SERVICES } from "@/lib/copy";
+import { COPY, SERVICE_NAMES } from "@/lib/copy";
 import { SITE_URL } from "@/lib/site";
 
 const time24 = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-const weekday = HOURS[1]!;
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 // Search engines read this to show hours, phone and address directly in results.
 const structuredData = {
@@ -36,20 +40,21 @@ const structuredData = {
     postalCode: SHOP.address.postalCode,
     addressCountry: "US",
   },
-  openingHoursSpecification: [
-    {
-      "@type": "OpeningHoursSpecification",
-      dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-      opens: time24(weekday.open),
-      closes: time24(weekday.close),
-    },
-  ],
+  openingHoursSpecification: Object.entries(HOURS).flatMap(([day, h]) =>
+    h ? [{ "@type": "OpeningHoursSpecification", dayOfWeek: DAY_NAMES[Number(day)], opens: time24(h.open), closes: time24(h.close) }] : [],
+  ),
   aggregateRating: { "@type": "AggregateRating", ratingValue: REVIEWS.rating, reviewCount: REVIEWS.count },
   areaServed: ["Dunn, NC", "Harnett County, NC", "I-95 corridor, North Carolina"],
   hasOfferCatalog: {
     "@type": "OfferCatalog",
     name: "Commercial tire and truck services",
-    itemListElement: ALL_SERVICES.map((name) => ({ "@type": "Offer", itemOffered: { "@type": "Service", name } })),
+    itemListElement: [
+      ...SERVICE_NAMES.map((name) => ({ "@type": "Offer", itemOffered: { "@type": "Service", name } })),
+      ...COPY.ttp.sizes.map((size) => ({
+        "@type": "Offer",
+        itemOffered: { "@type": "Product", name: `${COPY.ttp.name} ${size}, 18 ply`, brand: { "@type": "Brand", name: COPY.ttp.name } },
+      })),
+    ],
   },
   department: {
     "@type": "TireShop",
@@ -74,17 +79,21 @@ export default function Home() {
       </a>
       <SiteHeader />
       <main id="main">
-        <TireSequence />
+        <Showroom />
+        <TtpTire />
+        <Sizes />
         <Services />
-        <Sizing />
-        <Visit />
-        <Who />
         <Reviews />
+        <BookBand />
         <Location />
+        <Visit />
+        <TireHelp />
+        <Who />
         <Quote />
       </main>
       <SiteFooter />
       <ActionBar />
+      <Reveal />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }}

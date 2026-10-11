@@ -1,41 +1,67 @@
 # Truck Tire Pro: website
 
-Single-page site for Truck Tire Pro Inc., a commercial truck tire shop at
-918 Long Branch Rd, Dunn, NC.
+Website for Truck Tire Pro Inc., a commercial truck tire shop at
+918 Long Branch Rd, Dunn, NC: the home page and an appointment page at `/book`.
 
 ## Running it
 
     npm install
     npm run dev          # http://localhost:3000
     npm run build        # static production build
-    npm test             # hours + quote-message logic (Node's built-in runner, Node 22.18 or later)
+    npm test             # hours, booking slots and quote-message logic (Node's built-in runner, Node 22.18 or later)
     npm run lint
     npm run typecheck
 
-Next.js 16 (App Router), React 19, three.js, plain CSS. The page is prerendered
-as static HTML, so it deploys to Vercel (or any static host) with no
+Next.js 16 (App Router), React 19, three.js, plain CSS. The pages are prerendered
+as static HTML, so they deploy to Vercel (or any static host) with no
 configuration and no environment variables.
+
+## Booking emails (set this up once)
+
+`/book` sends each appointment request to the shop's inbox through
+[Web3Forms](https://web3forms.com), a free form-to-email service, straight from the
+visitor's browser. There's no server to run.
+
+1. Go to web3forms.com, enter the shop's email address, and they email an access key
+   to that inbox.
+2. Paste the key into `BOOKING.accessKey` in `lib/business.ts` and deploy.
+
+Until a key is set, the form still works: after the customer fills it in, it offers
+to send the same request as a text message to (910) 230-0433. It does the same if
+Web3Forms is ever unreachable. The access key is meant to be public; Web3Forms only
+ever sends to the address it was created for.
+
+Open days and times come from `HOURS` in `lib/business.ts` (shop time, America/New_York).
+`BOOKING` sets the slot length, how far ahead people can book, and the notice needed
+for a same-day slot. Requests are requests: the shop calls to confirm.
 
 ## What's on the page
 
 | Section | Notes |
 | --- | --- |
-| Tire sequence | A 3D studio scene (three.js) pinned to the screen while you scroll: the three tire positions, each with a three-quarter view and a close-up of its tread. `components/stage/`. |
-| Services | 12 services in two groups. |
-| Reading a tire size | What each part of `295/75R22.5` means. |
-| How a visit goes | Five steps and the one customer-reported turnaround figure. |
-| Who comes in | Owner-operators, fleets, vocational trucks, I-95 traffic. |
+| Showroom (hero) | Three tires in a 3D studio (three.js) and a button for each main service: TTP Tire, new, used, flat repair, balancing. A tap moves the camera to that service and shows booking and quote buttons beside it. `components/Showroom.tsx`, `components/stage/`. |
+| TTP Tire | The shop's own brand: sizes, 18 ply, made in Malaysia. Prices aren't published; it says to call. |
+| Hundreds of sizes in stock | Steer, drive and trailer; the three most popular sizes; the shop's promise. |
+| Services | 8 main services with a render each, linking to `/book` with the service filled in, plus 4 smaller ones. |
 | Reviews | 4.8 from 77 reviews, as listed online in October 2026. |
+| Booking band | Book an Appointment and Get a Quote. |
 | Hours and location | Map, hours table with today marked, live open/closed status (`lib/hours.ts`), and Fayetteville. |
+| How a visit goes | Five steps and the one customer-reported turnaround figure. |
+| Not sure what tire you need? | Reading a tire size, tire positions, a button to text a photo of the sidewall. |
+| Who comes in | Owner-operators, fleets, vocational trucks, I-95 traffic. |
 | Get a quote by text | Builds a text message to (910) 230-0433 in the visitor's own messages app (`lib/quote.ts`). No server, nothing stored. |
-| Phone action bar | Call, text, directions; fixed to the bottom on phones. |
+| Phone action bar | Get a Quote (calls the shop), Book, Directions; fixed to the bottom on phones. |
+
+"Get a Quote" buttons everywhere call (910) 230-0433. "Book an Appointment" buttons
+go to `/book`.
 
 ## Changing the words
 
-- **`lib/copy.ts`** holds every sentence on the page.
+- **`lib/copy.ts`** holds every sentence on the site.
 - **`lib/business.ts`** holds the facts: phone numbers, addresses, hours (minutes after
-  midnight per weekday) and the review figure. The copy, the live status, the hours
-  table, the footer and the structured data all read from there.
+  midnight per weekday), the review figure and the booking settings. The copy, the
+  live status, the hours table, the booking page, the footer and the structured data
+  all read from there.
 
 Things worth re-checking with the shop before launch:
 
@@ -44,8 +70,10 @@ Things worth re-checking with the shop before launch:
 - Roadside tire service availability.
 - The review figure (4.8 from 77) goes stale as reviews come in; update `REVIEWS`
   or remove it.
+- The TTP Tire in the 3D scene has a rib tread. If the real tire's tread looks
+  different, the model can be changed to match a photo.
 
-## The tire sequence
+## The 3D showroom
 
 Everything in it is generated in the browser from code; there are no model
 files or videos to download.
@@ -53,18 +81,21 @@ files or videos to download.
 - `components/stage/tireModel.ts` builds a 295/75R22.5 tire on a 10-hole aluminum
   wheel: the tread patterns (zig-zag rib steer, open-shoulder lug drive, straight rib
   trailer) are modelled flat and wrapped onto the crown, and the sidewall lettering
-  is a bump map drawn on a canvas.
-- `components/stage/tireScene.ts` is the studio: lights, floor, and the camera.
-  The key light follows the tire in focus while the others back away into the dark.
-- `components/stage/stageTimeline.ts` is the shot list: camera position, lens and
-  framing at each point of the scroll, and when each block of text shows.
-- `components/stage/TireStage.tsx` pins the section, feeds it the scroll position,
-  and fades the text.
+  is a bump map drawn on a canvas. Options add the TTP TIRE lettering, wear and
+  crayon marks, a repair plug, and balance weights.
+- `components/stage/stageStates.ts` is the shot list: for each stop, the camera,
+  lens and framing, and each tire's turn, roll and light. Phones get their own
+  framing for the opening shot.
+- `components/stage/tireScene.ts` is the studio (lights, floor, camera) and moves
+  between stops. Each frame is composed exactly like the matching poster image and
+  scaled the way CSS `object-fit: cover` scales it, so the swap from the poster to the
+  live scene doesn't jump.
 
-With reduced motion turned on, without WebGL, or before JavaScript runs, the same
-text shows as ordinary blocks over still renders in `public/stage/`. If you change
-the scene, re-render the stills from the dev server (the page exposes the scene as
-`window.__stage` in development) and replace those files.
+With reduced motion turned on, without WebGL, or before the 3D has loaded, still
+renders in `public/stage/` stand in (`hero-<stop>-<wide|mid|tall>.webp`). If you change
+the scene, re-render them from the dev server (in development the page exposes the
+scene as `window.__stage` and the shots as `window.__stops`) and replace those files.
+The service pictures in `public/services/` were rendered in the same studio.
 
 ## Design
 

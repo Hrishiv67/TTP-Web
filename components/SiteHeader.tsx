@@ -1,9 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { HOURS, SHOP, oneLine } from "@/lib/business";
+import { SHOP, oneLine } from "@/lib/business";
 import { COPY } from "@/lib/copy";
-import { formatRange } from "@/lib/hours";
 import { telHref } from "@/lib/quote";
 import { LiveStatus } from "./LiveStatus";
 import { PhoneIcon } from "./icons";
@@ -80,12 +80,12 @@ export function SiteHeader() {
     <>
       <header ref={header} className="masthead" data-tone={tone}>
         <div className="wrap masthead__inner">
-          <a className="masthead__logo" href="#top" aria-label={`${SHOP.name}, back to top`}>
+          <Link className="masthead__logo" href="/" aria-label={`${SHOP.name}, home`}>
             {/* eslint-disable-next-line @next/next/no-img-element -- static vector, nothing to optimize */}
             <img className="logo-dark" src="/logo-reverse.svg" alt="" width={1022} height={784} />
             {/* eslint-disable-next-line @next/next/no-img-element -- static vector, nothing to optimize */}
             <img className="logo-light" src="/logo.svg" alt="" width={1022} height={784} />
-          </a>
+          </Link>
 
           <nav className="masthead__nav" aria-label="Sections">
             {COPY.nav.map((item) => (
@@ -97,13 +97,16 @@ export function SiteHeader() {
 
           <LiveStatus compact className="masthead__status" />
 
-          <a className="btn btn--sm masthead__call" href={telHref(SHOP.phone.e164)}>
-            <PhoneIcon size={16} />
-            <span>
-              <span className="masthead__callWord">Call </span>
-              {SHOP.phone.display}
-            </span>
-          </a>
+          <div className="masthead__ctas">
+            <a className="btn btn--sm btn--line masthead__quote" href={telHref(SHOP.phone.e164)} aria-label={`${COPY.cta.quote}: call ${SHOP.phone.display}`}>
+              <PhoneIcon size={16} />
+              <span>{COPY.cta.quote}</span>
+            </a>
+            <a className="btn btn--sm masthead__book" href="/book">
+              <span className="masthead__bookLong">{COPY.cta.book}</span>
+              <span className="masthead__bookShort">{COPY.cta.bookShort}</span>
+            </a>
+          </div>
 
           <button
             ref={menuButton}
@@ -141,11 +144,16 @@ export function SiteHeader() {
         <div className="menu__foot">
           <LiveStatus />
           <p>{oneLine(SHOP.address)}</p>
-          <p>Monday to Friday, {formatRange(HOURS[1])}</p>
-          <a className="btn" href={telHref(SHOP.phone.e164)}>
-            <PhoneIcon />
-            <span>Call {SHOP.phone.display}</span>
-          </a>
+          <p>{COPY.hours.open}</p>
+          <div className="menu__ctas">
+            <a className="btn" href="/book" onClick={() => setOpen(false)}>
+              {COPY.cta.book}
+            </a>
+            <a className="btn btn--line" href={telHref(SHOP.phone.e164)}>
+              <PhoneIcon />
+              <span>{COPY.cta.quote}</span>
+            </a>
+          </div>
         </div>
       </div>
     </>

@@ -77,3 +77,21 @@ export function shopStatus(schedule: Schedule, date: Date, timeZone: string): St
 }
 
 export { DAY_NAMES };
+
+const MONDAY_FIRST = [1, 2, 3, 4, 5, 6, 0];
+
+/**
+ * The week in one line for each state, e.g. "Monday to Saturday, 8 AM to 5 PM" and
+ * "Sunday". Assumes the open days share one set of hours and run consecutively,
+ * which is true for this shop; check the output if the hours ever get more complex.
+ */
+export function weekHours(schedule: Schedule): { open: string; closed: string } {
+  const open = MONDAY_FIRST.filter((d) => schedule[d]);
+  const closed = MONDAY_FIRST.filter((d) => !schedule[d]);
+  const span = open.length > 1 ? `${DAY_NAMES[open[0]]} to ${DAY_NAMES[open[open.length - 1]]}` : DAY_NAMES[open[0]] ?? "";
+  const list = closed.map((d) => DAY_NAMES[d]);
+  return {
+    open: open.length ? `${span}, ${formatRange(schedule[open[0]])}` : "",
+    closed: list.length > 1 ? `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}` : list[0] ?? "",
+  };
+}

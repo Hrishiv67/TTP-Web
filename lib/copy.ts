@@ -1,123 +1,142 @@
 /**
- * Every sentence on the page. Facts that change (phone, hours, addresses, the
+ * Every sentence on the site. Facts that change (phone, hours, addresses, the
  * review figure) come from business.ts so they're only ever typed once.
  *
  * House style, so edits stay consistent: plain sentences in the shop's own
  * voice, sentence case, straight apostrophes, numerals for counts, no dashes
- * in prose, and no claim that isn't in business.ts or confirmed by the shop.
+ * in prose. Claims come from business.ts or from the shop's own earlier website
+ * (top brands at competitive prices, used tires from a fraction of new, repairs
+ * often the same day). The TTP Tire facts and the promise come from the shop. Prices
+ * aren't published: the shop prefers that customers call.
  */
-import { REVIEWS, SECOND_LOCATION, SHOP } from "./business";
+import { HOURS, REVIEWS, SECOND_LOCATION, SHOP } from "./business";
+import { weekHours } from "./hours";
 
 const PHONE = SHOP.phone.display;
+const TTP_SIZES = ["295/75R22.5", "11R22.5"] as const;
+const WEEK = weekHours(HOURS);
 
 export const COPY = {
   meta: {
-    title: "Truck Tire Pro | Commercial truck tires in Dunn, NC",
-    description: `We sell and repair commercial truck tires at our shop in Dunn, NC, near I-95. Open Monday to Friday, 8 AM to 5 PM. Call ${PHONE}.`,
+    title: "Truck Tire Pro | Semi truck tires in Dunn, NC",
+    description: `Semi truck tires in Dunn, NC, near I-95: steer, drive and trailer tires, hundreds of sizes in stock, and our own TTP Tire. Flat repair, balancing and alignment too. Open ${WEEK.open}. Call ${PHONE} for pricing.`,
   },
+
+  // { open: "Monday to Saturday, 8 AM to 5 PM", closed: "Sunday" }, plus a short form for the header
+  hours: { ...WEEK, compact: "Mon to Sat, 8 AM to 5 PM" },
 
   nav: [
-    { href: "#tires", label: "Tires" },
-    { href: "#services", label: "Services" },
-    { href: "#visit", label: "How a visit goes" },
-    { href: "#location", label: "Hours and location" },
-    { href: "#quote", label: "Get a quote" },
+    { href: "/#ttp-tire", label: "TTP Tire" },
+    { href: "/#services", label: "Services" },
+    { href: "/#reviews", label: "Reviews" },
+    { href: "/#location", label: "Hours and location" },
   ],
 
-  hero: {
-    headline: "Commercial truck tires in Dunn, near I-95",
-    sub: "We sell new and used tires for semis, box trucks, pickups and trailers, and we fix flats. The shop is on Long Branch Road and is open Monday to Friday, 8 AM to 5 PM.",
-    call: `Call ${PHONE}`,
-    text: "Text us your tire size for a quote",
+  cta: {
+    book: "Book an Appointment",
+    bookShort: "Book",
+    quote: "Get a Quote",
+    bookTime: "Book a time",
   },
 
-  tires: {
-    label: "Tires by position",
-    intro: "The tire you need for a tractor-trailer depends on which of the 3 positions it goes in.",
-    positions: [
-      {
-        kind: "steer",
-        name: "Steer tires",
-        line: "The 2 tires up front should be the best ones on the truck.",
-        body: "Steer tires go on the front axle. Their rib tread is made for steering and for even wear.",
-        facts: [
-          ["Position", "Front axle, 2 tires"],
-          ["Tread", "Rib, for steering and even wear"],
-          ["Common sizes", "11R22.5, 295/75R22.5, 11R24.5, 285/75R24.5"],
-        ],
-      },
-      {
-        kind: "drive",
-        name: "Drive tires",
-        line: "These are the tires the engine turns.",
-        body: "They have a lug or block tread, with deep grooves for traction.",
-        facts: [
-          ["Position", "Powered tandem axles, 8 tires"],
-          ["Tread", "Lug or block, deep grooves for traction"],
-          ["Common sizes", "11R22.5, 295/75R22.5, 11R24.5, 285/75R24.5"],
-        ],
-      },
-      {
-        kind: "trailer",
-        name: "Trailer tires",
-        line: "They carry the load and roll free behind the tractor.",
-        body: "In a tight turn, trailer tires get dragged sideways across the pavement. That's called scrub, and their rib tread is built to stand up to it.",
-        facts: [
-          ["Position", "Trailer tandem, 8 tires"],
-          ["Tread", "Rib, for carrying load and resisting scrub"],
-          ["Common sizes", "11R22.5, 295/75R22.5, 11R24.5, 285/75R24.5"],
-        ],
-      },
+  hero: {
+    label: "Truck Tire Pro",
+    headline: "Semi truck tires in Dunn, near I-95",
+    sub: "Steer, drive and trailer tires, with hundreds of sizes in stock at both locations. Call for pricing.",
+    hours: `Open ${WEEK.open}`,
+    pick: "See what we do",
+    back: "Back to all tires",
+    // the stops in the 3D showroom; ids match the scene's shots
+    stops: [
+      { id: "ttp", label: "TTP Tire", line: "Our own brand of tire. It's 18 ply, made in Malaysia, and gives a smoother ride." },
+      { id: "new", label: "New tires", line: "Top truck tire brands at competitive prices, for semis, box trucks, pickups and trailers." },
+      { id: "used", label: "Used tires", line: "Every one is inspected before it goes on the rack, and they start at a fraction of the price of new." },
+      { id: "repair", label: "Flat repair", line: "Punctures and slow leaks, often fixed the same day." },
+      { id: "balance", label: "Balancing", line: "A balanced wheel stops the vibration and helps the tire last longer." },
     ],
-    outro: "We also do tires for box trucks, dump trucks and pickups.",
+    stillAlt: {
+      all: "A new TTP Tire, a used tire and a repaired tire standing side by side",
+      ttp: "A TTP Tire, the shop's own brand, with TTP TIRE and 18 PLY RATING on the sidewall",
+      new: "A new truck tire on an aluminum wheel",
+      used: "A used truck tire with its tread depth marked in crayon",
+      repair: "A plug sealing a puncture in a truck tire's tread",
+      balance: "Balance weights on the rim of a truck wheel",
+    },
+  },
+
+  ttp: {
+    name: "TTP Tire",
+    sizes: TTP_SIZES,
+    kicker: "Our own brand",
+    body: "We sell our own tire. It's made for every kind of trucker, long haul or short haul, dump truck or over-the-road, and it gives a smoother ride.",
+    facts: [
+      ["Sizes", TTP_SIZES.join(" and ")],
+      ["Ply rating", "18 ply"],
+      ["Made in", "Malaysia"],
+    ],
+    price: "Call for pricing",
+    alt: "A TTP Tire on an aluminum wheel, with TTP TIRE and 18 PLY RATING on the sidewall",
+  },
+
+  sizes: {
+    heading: "Hundreds of sizes in stock",
+    body: "We mostly sell semi truck tires: steer, drive and trailer. Both locations carry hundreds of sizes.",
+    popularHeading: "Our most popular sizes",
+    popular: ["295/75R22.5", "11R22.5", "11R24.5"],
+    price: `Call ${PHONE} for pricing on any size.`,
+    promise: "We promise quality and satisfaction with every tire.",
   },
 
   services: {
-    heading: "Services",
-    intro: `For anything that isn't listed here, call ${PHONE} and ask.`,
-    groups: [
-      {
-        name: "Tires and wheels",
-        items: [
-          ["New tires", "We sell steer, drive and trailer tires, and tires for box trucks and pickups."],
-          ["Used tires", "We inspect every used tire before we sell it, and they cost less than new."],
-          ["Mounting and installation", "We mount the tire on the rim and put the wheel back on your truck."],
-          ["Flat repair", "We check the puncture or slow leak first and fix it if it's safe to repair. If it isn't, we replace the tire."],
-          ["Wheel balancing", "We balance truck and trailer wheels."],
-          ["Wheel alignment", "Uneven wear on the steer tires can mean the alignment is off. We check it and set it back."],
-          ["Tire maintenance", "We do rotations and pressure checks."],
-          ["Roadside tire service", `Call ${PHONE} from the road and we'll see if someone can come out to you.`],
-        ],
-      },
-      {
-        name: "Truck and trailer repair",
-        items: [
-          ["Truck A/C repair", "We find A/C problems, recharge the system, fix broken parts and put in new compressors."],
-          ["Trailer brake repair", "We repair trailer brakes."],
-          ["Minor repairs", "We put on new mudflaps and replace the hardware that holds them."],
-          ["Trailer washouts", "We clean out the inside of your trailer between loads."],
-        ],
-      },
+    heading: "Everything for your truck's tires",
+    intro: "New and used tires, flat repair, balancing, alignment and maintenance, plus A/C work and trailer washouts.",
+    main: [
+      { id: "new", name: "New tires", body: "We stock top truck tire brands and our own TTP Tire, in sizes for semis, box trucks, pickups and trailers.", alt: "A new truck tire on an aluminum wheel" },
+      { id: "used", name: "Used tires", body: "Every used tire is inspected before it goes on the rack, and they start at a fraction of the price of new.", alt: "A used truck tire with its tread depth marked in crayon" },
+      { id: "repair", name: "Tire repair", body: "We fix flats, punctures and slow leaks, and get you back on the road fast, often the same day.", alt: "A plug sealing a puncture in a tire's tread" },
+      { id: "balance", name: "Wheel balancing", body: "Balancing stops the vibration you feel at speed and helps your tires last longer.", alt: "Balance weights clipped to the rim of a truck wheel" },
+      { id: "alignment", name: "Alignment", body: "We set the alignment so the truck tracks straight. That keeps the tires from wearing unevenly and saves fuel.", alt: "A red alignment laser line across a steer tire's tread" },
+      { id: "ac", name: "A/C work", body: "We diagnose and repair semi truck A/C, recharge the system and put in new compressors, so you stay cool on the road.", alt: "A truck A/C compressor" },
+      { id: "washout", name: "Trailer washouts", body: "We wash out debris, residue and buildup between loads, with a quick turnaround so you stay on schedule.", alt: "The clean inside of a trailer with its rear doors open" },
+      { id: "maintenance", name: "General maintenance", body: "Rotations, pressure checks and tread inspections for one truck or a whole fleet.", alt: "A pressure gauge on a truck tire's valve stem" },
     ],
+    alsoHeading: "We also do",
+    also: [
+      ["Mounting and installation", "We mount the tire on the rim and put the wheel back on your truck."],
+      ["Roadside tire service", `Call ${PHONE} from the road and we'll see if someone can come out to you.`],
+      ["Trailer brake repair", "We repair trailer brakes."],
+      ["Minor repairs", "We put on new mudflaps and replace the hardware that holds them."],
+    ],
+    other: `For anything that isn't listed here, call ${PHONE} and ask.`,
   },
 
-  sizing: {
-    heading: "Reading a tire size",
-    intro: "Every tire has its size molded into the sidewall. 295/75R22.5 is a common tractor-trailer size, and this is how it breaks down.",
-    code: "295/75R22.5",
-    parts: [
-      ["295", "Section width", "The tire is 295 millimeters wide."],
-      ["75", "Aspect ratio", "The sidewall height is 75 percent of the width."],
-      ["R", "Construction", "R means the tire is a radial."],
-      ["22.5", "Rim diameter", "It fits a 22.5-inch rim."],
-    ],
-    note: "There's no aspect ratio in a size like 11R22.5, which is an 11-inch-wide radial for a 22.5-inch rim. If you can't tell what you have, read us the sidewall over the phone.",
+  reviews: {
+    heading: "Reviews",
+    ratingLine: `${REVIEWS.rating} average from ${REVIEWS.count} reviews`,
+    mentions: "Customers often mention quick turnaround and fair prices.",
+    link: "Read the reviews",
+    asOf: `As listed online in ${REVIEWS.asOf}.`,
+  },
+
+  bookBand: {
+    heading: "Need tires or a repair?",
+    body: `Book a time online, or call ${PHONE} for a quote.`,
+  },
+
+  location: {
+    heading: "Hours and location",
+    dunnLabel: "Dunn, main shop",
+    fayettevilleLabel: SECOND_LOCATION.label,
+    fayettevilleNote: `Call ${SECOND_LOCATION.phone.display} to check this location's hours.`,
+    directions: "Get directions",
+    openMap: "Open in Google Maps",
+    hoursHeading: "Hours",
   },
 
   visit: {
     heading: "How a visit goes",
     steps: [
-      ["Call or pull in", "We're open Monday to Friday, 8 AM to 5 PM. Calling first lets us check whether we have your size."],
+      ["Book or pull in", `Book a time online, call ${PHONE}, or pull in ${WEEK.open}. Calling first lets us check whether we have your size.`],
       ["Tell us about the tire", "Give us the size and which axle it's on. If it went flat or got damaged, tell us what happened."],
       ["We look at it", "A tech inspects the tire to see if it can be safely repaired."],
       ["You get a price", "We tell you the cost before any work starts."],
@@ -125,7 +144,33 @@ export const COPY = {
     ],
     turnaround: {
       figure: "One customer had 8 tires changed in about 45 minutes.",
-      note: "That's from one customer's review, not a promise. Ask how long your job will take when you call.",
+      note: "That's from one customer's review, not a promise. Ask how long your job will take when you book.",
+    },
+  },
+
+  tireHelp: {
+    heading: "Not sure what tire you need?",
+    intro: "Read us the size off the sidewall, or text a photo of it, and we'll tell you what fits.",
+    textPhoto: "Text us a photo of your sidewall",
+    sizing: {
+      heading: "Reading a tire size",
+      code: "295/75R22.5",
+      parts: [
+        ["295", "Section width", "The tire is 295 millimeters wide."],
+        ["75", "Aspect ratio", "The sidewall height is 75 percent of the width."],
+        ["R", "Construction", "R means the tire is a radial."],
+        ["22.5", "Rim diameter", "It fits a 22.5-inch rim."],
+      ],
+      note: "There's no aspect ratio in a size like 11R22.5, which is an 11-inch-wide radial for a 22.5-inch rim.",
+    },
+    positions: {
+      heading: "Tire positions on a tractor-trailer",
+      rows: [
+        ["Steer", "Front axle, 2 tires. Rib tread, for steering and even wear. They should be the best tires on the truck."],
+        ["Drive", "Powered tandem axles, 8 tires. Lug or block tread with deep grooves for traction."],
+        ["Trailer", "Trailer tandem, 8 tires. Rib tread, built to carry the load and stand up to scrub in tight turns."],
+      ],
+      sizes: "Our most popular sizes are 295/75R22.5, 11R22.5 and 11R24.5.",
     },
   },
 
@@ -140,26 +185,8 @@ export const COPY = {
     note: "We mostly work on commercial vehicles, so call before you bring in a car.",
   },
 
-  reviews: {
-    heading: "Reviews",
-    ratingLine: `${REVIEWS.rating} average from ${REVIEWS.count} reviews`,
-    mentions: "Customers often mention quick turnaround and fair prices.",
-    link: "Read the reviews",
-    asOf: `As listed online in ${REVIEWS.asOf}.`,
-  },
-
-  location: {
-    heading: "Hours and location",
-    dunnLabel: "Dunn, main shop",
-    fayettevilleLabel: SECOND_LOCATION.label,
-    fayettevilleNote: `Call ${SECOND_LOCATION.phone.display} to check this location's hours.`,
-    directions: "Get directions",
-    openMap: "Open in Google Maps",
-    hoursHeading: "Hours",
-  },
-
   quote: {
-    heading: "Get a quote by text",
+    heading: "Rather text? Get a quote by text",
     intro: "Fill in what you know about the tire and the truck. Anything else can go in the notes.",
     callLine: "You can also call us at",
     fields: {
@@ -186,11 +213,62 @@ export const COPY = {
     },
   },
 
-  actionBar: { call: "Call", text: "Text", directions: "Directions" },
+  booking: {
+    title: `Book an appointment | ${SHOP.name}`,
+    description: `Pick a day and time for new or used tires, flat repair, balancing, alignment and more at ${SHOP.name} in Dunn, NC.`,
+    heading: "Book an appointment",
+    intro: "Pick a day and time and tell us what the truck needs. We'll call to confirm.",
+    fields: {
+      service: { label: "What you need" },
+      vehicle: { label: "Vehicle" },
+      size: { label: "Tire size", hint: "If you know it, for example 295/75R22.5" },
+      day: { label: "Day" },
+      time: { label: "Time" },
+      name: { label: "Your name", hint: "First name is fine" },
+      phone: { label: "Phone number", hint: "We'll call this number to confirm" },
+      email: { label: "Email", hint: "Optional" },
+      notes: { label: "Anything else", hint: "Optional: what happened, how many tires" },
+    },
+    loadingDays: "Loading open days",
+    pickDay: "Pick a day first",
+    submit: "Request appointment",
+    sending: "Sending",
+    errors: {
+      service: "Pick what you need.",
+      day: "Pick a day.",
+      time: "Pick a time.",
+      name: "Tell us your name.",
+      phone: "Enter a 10-digit phone number.",
+    },
+    success: {
+      heading: "Request sent",
+      body: (phone: string, day: string, time: string) =>
+        `We'll call you at ${phone} to confirm ${day} at ${time}. If it's urgent, call ${PHONE}.`,
+      another: "Book another",
+    },
+    failed: {
+      heading: "Your request didn't go through",
+      body: `Please send it as a text instead, or call ${PHONE}.`,
+      text: "Send as a text",
+      call: `Call ${PHONE}`,
+    },
+    noKey: {
+      heading: "Send your request by text",
+      body: `Online booking is being set up. Send your request as a text, or call ${PHONE}.`,
+    },
+    smsIntro: "Hi, I'd like to book an appointment.",
+    side: {
+      hoursHeading: "Hours",
+      whereHeading: "Where",
+      callHeading: "Rather call?",
+    },
+  },
+
+  actionBar: { quote: "Get a Quote", book: "Book", directions: "Directions" },
 
   sms: {
     greeting: "Hi, this is a quote request from your website.",
-    actionBarBody: "Hi, I'm looking for a tire quote. Size and position: ",
+    sidewall: "Hi, here's a photo of my tire's sidewall. Can you tell me what fits?",
   },
 
   footer: {
@@ -198,7 +276,7 @@ export const COPY = {
     visit: "Visit",
     call: "Call",
     hours: "Hours",
-    links: "On this page",
+    links: "On this site",
     backToTop: "Back to top",
   },
 
@@ -209,5 +287,8 @@ export const COPY = {
   },
 } as const;
 
-/** Service names, for the quote form and the structured data. */
-export const ALL_SERVICES = COPY.services.groups.flatMap((g) => g.items.map(([name]) => name));
+/** Every service, for the structured data. */
+export const SERVICE_NAMES = [...COPY.services.main.map((s) => s.name), ...COPY.services.also.map(([name]) => name)];
+
+/** What a customer can ask for in the quote and booking forms: the house tire, then every service. */
+export const ALL_SERVICES = [COPY.ttp.name, ...SERVICE_NAMES];

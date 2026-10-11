@@ -55,7 +55,24 @@ export const HOURS: Record<number, { open: number; close: number } | null> = {
   3: { open: 8 * 60, close: 17 * 60 },
   4: { open: 8 * 60, close: 17 * 60 },
   5: { open: 8 * 60, close: 17 * 60 },
-  6: null,
+  6: { open: 8 * 60, close: 17 * 60 },
 };
 
 export const TIME_ZONE = "America/New_York";
+
+/**
+ * Appointment requests from /book are emailed to the shop through Web3Forms
+ * (web3forms.com). The access key is tied to the inbox it was created for and is
+ * meant to sit in public website code. Until it's set, the form offers to send the
+ * request as a text message instead.
+ */
+export const BOOKING = {
+  endpoint: "https://api.web3forms.com/submit",
+  accessKey: "",
+  // appointments start on the half hour, the last one 30 minutes before closing,
+  // and same-day requests need at least an hour's notice
+  slotMinutes: 30,
+  lastSlotBeforeClose: 30,
+  leadMinutes: 60,
+  daysAhead: 12,
+};

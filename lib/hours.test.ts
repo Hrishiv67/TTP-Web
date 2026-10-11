@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { formatRange, formatTime, shopClock, shopStatus } from "./hours.ts";
+import { formatRange, formatTime, shopClock, shopStatus, weekHours } from "./hours.ts";
 import { HOURS, TIME_ZONE } from "./business.ts";
 
 // October dates are EDT (UTC-4); January is EST (UTC-5).
@@ -33,9 +33,12 @@ test("closed at 5 sharp, opens tomorrow midweek", () => {
   assert.equal(s.label, "Closed, opens tomorrow at 8 AM");
 });
 
-test("Friday evening and the weekend roll to Monday", () => {
-  assert.equal(at("2026-10-16T22:00:00Z").label, "Closed, opens Monday at 8 AM"); // Fri 18:00
-  assert.equal(at("2026-10-17T15:00:00Z").short, "Closed, opens Mon 8 AM"); // Sat 11:00
+test("open Saturdays; Saturday evening and Sunday roll to Monday", () => {
+  assert.equal(at("2026-10-16T22:00:00Z").label, "Closed, opens tomorrow at 8 AM"); // Fri 18:00
+  assert.equal(at("2026-10-17T15:00:00Z").open, true); // Sat 11:00
+  assert.equal(at("2026-10-17T22:00:00Z").label, "Closed, opens Monday at 8 AM"); // Sat 18:00
+  assert.equal(at("2026-10-18T15:00:00Z").short, "Closed, opens tomorrow 8 AM"); // Sun 11:00
+  assert.equal(at("2026-10-17T22:00:00Z").short, "Closed, opens Mon 8 AM"); // Sat 18:00
   assert.equal(at("2026-10-12T00:30:00Z").label, "Closed, opens tomorrow at 8 AM"); // Sun 20:30
 });
 
@@ -51,4 +54,10 @@ test("formats times and ranges", () => {
   assert.equal(formatTime(12 * 60), "12 PM");
   assert.equal(formatRange(HOURS[1]), "8 AM to 5 PM");
   assert.equal(formatRange(HOURS[0]), "Closed");
+});
+
+test("summarizes the week", () => {
+  assert.deepEqual(weekHours(HOURS), { open: "Monday to Saturday, 8 AM to 5 PM", closed: "Sunday" });
+  const weekdays = { ...HOURS, 6: null };
+  assert.deepEqual(weekHours(weekdays), { open: "Monday to Friday, 8 AM to 5 PM", closed: "Saturday and Sunday" });
 });

@@ -1,56 +1,51 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow, Barlow_Condensed, IBM_Plex_Mono } from "next/font/google";
+import { Besley, Libre_Franklin } from "next/font/google";
+import { COPY } from "@/lib/copy";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
-// Barlow was drawn from highway signs and plates — the right voice for a truck shop.
-const barlow = Barlow({
+// Besley is a Clarendon: the bracketed slab of wood-type posters and old shop signs.
+const besley = Besley({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-barlow",
+  weight: ["700"],
+  variable: "--font-besley",
   display: "swap",
 });
 
-const condensed = Barlow_Condensed({
+// Libre Franklin revives Franklin Gothic, the face of American signage and newsprint.
+const franklin = Libre_Franklin({
   subsets: ["latin"],
-  weight: ["700", "800"],
-  variable: "--font-condensed",
+  variable: "--font-franklin",
   display: "swap",
 });
-
-const plexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["500"],
-  variable: "--font-plex-mono",
-  display: "swap",
-});
-
-const description =
-  "New and used commercial truck tires, mounting, flat repair, balancing, alignment and trailer service in Dunn, North Carolina — a few minutes off I-95. Call (910) 230-0433.";
 
 export const metadata: Metadata = {
-  title: "Truck Tire Pro — Commercial Truck Tires in Dunn, NC",
-  description,
+  metadataBase: new URL(SITE_URL),
+  title: COPY.meta.title,
+  description: COPY.meta.description,
   applicationName: "Truck Tire Pro",
+  alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     locale: "en_US",
+    url: "/",
     siteName: "Truck Tire Pro",
-    title: "Truck Tire Pro — Commercial Truck Tires in Dunn, NC",
-    description,
+    title: COPY.meta.title,
+    description: COPY.meta.description,
   },
   twitter: { card: "summary_large_image" },
   formatDetection: { telephone: true, address: true },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#16130f",
+  themeColor: "#000000",
   width: "device-width",
   initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${barlow.variable} ${condensed.variable} ${plexMono.variable}`}>
+    <html lang="en" className={`${besley.variable} ${franklin.variable}`}>
       <body id="top">{children}</body>
     </html>
   );

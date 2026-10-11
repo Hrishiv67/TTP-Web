@@ -1,22 +1,24 @@
 import { SHOP, directionsUrl } from "@/lib/business";
+import { COPY } from "@/lib/copy";
 import { smsHref, telHref } from "@/lib/quote";
 import { MessageIcon, PhoneIcon, PinIcon } from "./icons";
 
-/** Phones only: the three things a driver on the shoulder actually needs, always in reach of a thumb. */
+/** Phones only: call, text and directions, always within reach of a thumb. */
 export function ActionBar() {
+  const c = COPY.actionBar;
   return (
     <nav className="actionbar" aria-label="Quick contact">
       <a className="actionbar__call" href={telHref(SHOP.phone.e164)}>
         <PhoneIcon size={16} />
-        Call
+        {c.call}
       </a>
-      <a href={smsHref(SHOP.phone.e164, `Hi ${SHOP.name}, I need a quote. Tire size: `)}>
+      <a href={smsHref(SHOP.phone.e164, COPY.sms.actionBarBody)}>
         <MessageIcon size={16} />
-        Text
+        {c.text}
       </a>
       <a href={directionsUrl(SHOP.address)} target="_blank" rel="noopener noreferrer">
         <PinIcon size={16} />
-        Directions
+        {c.directions}
       </a>
     </nav>
   );

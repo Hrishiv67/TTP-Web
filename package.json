@@ -11,19 +11,21 @@
     "test": "node --test lib/*.test.ts"
   },
   "dependencies": {
-    "next": "16.3.4",
+    "next": "16.3.8",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "three": "0.186.0"
   },
   "devDependencies": {
     "@types/node": "^26.5.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "0.186.0",
     "eslint": "9.39.5",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "16.3.8",
     "typescript": "5.9.3"
   },
   "engines": {
-    "node": ">=22.18"
+    "node": ">=22.18 <25"
   }
 }

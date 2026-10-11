@@ -1,16 +1,19 @@
-import { HOURS, NAV, SECOND_LOCATION, SHOP } from "@/lib/business";
+import { HOURS, SECOND_LOCATION, SHOP } from "@/lib/business";
+import { COPY } from "@/lib/copy";
 import { formatRange } from "@/lib/hours";
 import { telHref } from "@/lib/quote";
+import { CopyrightYear } from "./CopyrightYear";
 
 export function SiteFooter() {
+  const f = COPY.footer;
   return (
-    <footer className="footer">
+    <footer className="footer" data-header="dark">
       <div className="wrap">
         <div className="footer__top">
           {/* eslint-disable-next-line @next/next/no-img-element -- static vector */}
-          <img className="footer__logo" src="/logo-reverse.svg" alt={`${SHOP.legalName} — Quality Tires`} width={1022} height={784} loading="lazy" />
+          <img className="footer__logo" src="/logo-reverse.svg" alt={SHOP.legalName} width={1022} height={784} loading="lazy" />
           <div className="footer__col">
-            <h2 className="label-s">Visit</h2>
+            <h2>{f.visit}</h2>
             <address>
               {SHOP.address.street}
               <br />
@@ -23,31 +26,21 @@ export function SiteFooter() {
             </address>
           </div>
           <div className="footer__col">
-            <h2 className="label-s">Call</h2>
+            <h2>{f.call}</h2>
             <p>
-              <span>Dunn</span>
-              <a href={telHref(SHOP.phone.e164)}>{SHOP.phone.display}</a>
+              Dunn: <a href={telHref(SHOP.phone.e164)}>{SHOP.phone.display}</a>
             </p>
             <p>
-              <span>Fayetteville</span>
-              <a href={telHref(SECOND_LOCATION.phone.e164)}>{SECOND_LOCATION.phone.display}</a>
+              {SECOND_LOCATION.label}: <a href={telHref(SECOND_LOCATION.phone.e164)}>{SECOND_LOCATION.phone.display}</a>
             </p>
-          </div>
-          <div className="footer__col">
-            <h2 className="label-s">Hours</h2>
-            <p>
-              <span>Mon–Fri</span>
-              {formatRange(HOURS[1])}
-            </p>
-            <p>
-              <span>Sat–Sun</span>
-              Closed
-            </p>
+            <h2 className="footer__sub">{f.hours}</h2>
+            <p>Monday to Friday, {formatRange(HOURS[1])}</p>
+            <p>Saturday and Sunday, closed</p>
           </div>
           <nav className="footer__col" aria-label="Footer">
-            <h2 className="label-s">On this page</h2>
+            <h2>{f.links}</h2>
             <ul>
-              {NAV.map((n) => (
+              {COPY.nav.map((n) => (
                 <li key={n.href}>
                   <a href={n.href}>{n.label}</a>
                 </li>
@@ -55,13 +48,12 @@ export function SiteFooter() {
             </ul>
           </nav>
         </div>
-        <div className="footer__bottom label-s">
+        <div className="footer__bottom">
+          <p>{f.blurb}</p>
           <p>
-            © {new Date().getFullYear()} {SHOP.legalName} · Dunn, North Carolina · Est. {SHOP.founded}
+            © <CopyrightYear /> {SHOP.legalName}
           </p>
-          <a href="#top">
-            Back to top <span aria-hidden="true">↑</span>
-          </a>
+          <a href="#top">{f.backToTop}</a>
         </div>
       </div>
     </footer>

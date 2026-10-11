@@ -1,38 +1,27 @@
 import { REVIEWS } from "@/lib/business";
+import { COPY } from "@/lib/copy";
 
 export function Reviews() {
+  const { heading, ratingLine, mentions, link, asOf } = COPY.reviews;
   return (
-    <section className="reviews" id="reviews" aria-labelledby="reviews-title">
-      <div className="wrap reviews__inner">
-        <div className="reviews__score">
-          <p className="reviews__number" aria-hidden="true">
+    <section className="section" id="reviews" aria-labelledby="reviews-title">
+      <div className="wrap">
+        <h2 className="sr-only" id="reviews-title">
+          {heading}
+        </h2>
+        <div className="reviews">
+          <p className="reviews__score" aria-hidden="true">
             {REVIEWS.rating}
           </p>
-          <div className="reviews__meta">
-            <h2 className="sr-only" id="reviews-title">
-              Rated {REVIEWS.rating} out of 5 from {REVIEWS.count} reviews
-            </h2>
-            <p className="reviews__stars" aria-hidden="true">
-              ★★★★★
+          <div className="reviews__body">
+            <p className="t-h3">{ratingLine}</p>
+            <p className="t-lede">{mentions}</p>
+            <p>
+              <a className="link" href={REVIEWS.url} target="_blank" rel="noopener noreferrer">
+                {link}
+              </a>
             </p>
-            <p className="label">Out of 5</p>
-            <p className="label">{REVIEWS.count} reviews</p>
-          </div>
-        </div>
-        <div className="reviews__themes">
-          <p className="label">What customers bring up most</p>
-          <ul>
-            {REVIEWS.themes.map((t) => (
-              <li className="display-m" key={t}>
-                {t}
-              </li>
-            ))}
-          </ul>
-          <div className="reviews__foot">
-            <a className="link link--paper" href={REVIEWS.url} target="_blank" rel="noopener noreferrer">
-              Read the reviews on Google <span aria-hidden="true">↗</span>
-            </a>
-            <p className="label-s">Rating as listed online, {REVIEWS.asOf}</p>
+            <p className="t-small">{asOf}</p>
           </div>
         </div>
       </div>

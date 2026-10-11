@@ -18,7 +18,7 @@ svg = src.read_text()
 view_box = re.search(r'viewBox="([^"]+)"', svg).group(1)
 ink_abs, red_abs = re.findall(r' d="([^"]+)"', svg)
 ink, red = compact(ink_abs, 1), compact(red_abs, 1)
-label = "Truck Tire Pro Inc. — Quality Tires, est. 2020"
+label = "Truck Tire Pro Inc., Quality Tires, est. 2020"
 
 for name, ink_fill, red_fill in [("logo.svg", "#16130F", "#E3161E"), ("logo-reverse.svg", "#F2ECE1", "#E8262D")]:
     (root / "public" / name).write_text(

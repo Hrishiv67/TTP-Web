@@ -1,16 +1,16 @@
 /**
  * Live open/closed status. The page is static, so this runs in the visitor's
- * browser — but against the shop's clock, not theirs: a driver in Ohio looking
- * at a Dunn shop needs Eastern time.
+ * browser, but against the shop's clock rather than theirs: a driver in Ohio
+ * looking at a Dunn shop needs Eastern time.
  */
 
 export type Schedule = Record<number, { open: number; close: number } | null>;
 
 export type Status = {
   open: boolean;
-  /** Full sentence for the utility bar and the hours table. */
+  /** Full form, for the hours section. */
   label: string;
-  /** Compact form for narrow screens. */
+  /** Compact form, for the header. */
   short: string;
 };
 
@@ -42,7 +42,7 @@ export function formatTime(minutes: number): string {
 }
 
 export function formatRange(hours: { open: number; close: number } | null): string {
-  return hours ? `${formatTime(hours.open)} – ${formatTime(hours.close)}` : "Closed";
+  return hours ? `${formatTime(hours.open)} to ${formatTime(hours.close)}` : "Closed";
 }
 
 export function shopStatus(schedule: Schedule, date: Date, timeZone: string): Status {
@@ -52,15 +52,15 @@ export function shopStatus(schedule: Schedule, date: Date, timeZone: string): St
   if (today && minutes >= today.open && minutes < today.close) {
     const left = today.close - minutes;
     if (left <= 60) {
-      return { open: true, label: `Open now · closes in ${left} min`, short: `Open · closes in ${left} min` };
+      return { open: true, label: `Open now, closes in ${left} min`, short: `Open, closes in ${left} min` };
     }
     const at = formatTime(today.close);
-    return { open: true, label: `Open now · closes at ${at}`, short: `Open · closes ${at}` };
+    return { open: true, label: `Open now, closes at ${at}`, short: `Open until ${at}` };
   }
 
   if (today && minutes < today.open) {
     const at = formatTime(today.open);
-    return { open: false, label: `Closed · opens today at ${at}`, short: `Closed · opens ${at}` };
+    return { open: false, label: `Closed, opens today at ${at}`, short: `Closed, opens ${at}` };
   }
 
   for (let i = 1; i <= 7; i++) {
@@ -70,7 +70,7 @@ export function shopStatus(schedule: Schedule, date: Date, timeZone: string): St
     const at = formatTime(hours.open);
     const when = i === 1 ? "tomorrow" : DAY_NAMES[next];
     const whenShort = i === 1 ? "tomorrow" : WEEKDAY_ABBR[next];
-    return { open: false, label: `Closed · opens ${when} at ${at}`, short: `Closed · opens ${whenShort} ${at}` };
+    return { open: false, label: `Closed, opens ${when} at ${at}`, short: `Closed, opens ${whenShort} ${at}` };
   }
 
   return { open: false, label: "Closed", short: "Closed" };

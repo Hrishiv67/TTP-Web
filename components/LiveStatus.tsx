@@ -12,7 +12,7 @@ export function LiveStatus({ compact = false, className = "" }: { compact?: bool
   const now = useNow();
   const status = now === null ? null : shopStatus(HOURS, new Date(now), TIME_ZONE);
   const state = status === null ? "unknown" : status.open ? "open" : "closed";
-  const text = status === null ? "Mon–Fri · 8 AM – 5 PM" : compact ? status.short : status.label;
+  const text = status === null ? (compact ? "Open weekdays 8 to 5" : "Open Monday to Friday, 8 AM to 5 PM") : compact ? status.short : status.label;
 
   return (
     <p className={`status ${className}`} data-state={state}>

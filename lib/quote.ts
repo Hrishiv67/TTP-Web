@@ -1,7 +1,7 @@
 /**
  * The quote form doesn't post anywhere. It writes a text message and hands it to
- * the visitor's own messages app, addressed to the shop — no server, no inbox to
- * monitor, and the shop replies from the phone it already answers.
+ * the visitor's own messages app, addressed to the shop. There's no server and
+ * no inbox to watch, and the shop replies from the phone it already answers.
  */
 
 export type QuoteRequest = {
@@ -17,7 +17,7 @@ export type QuoteRequest = {
 
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 
-export function quoteMessage(q: QuoteRequest, shopName: string): string {
+export function quoteMessage(q: QuoteRequest, greeting: string): string {
   const lines: [string, string][] = [
     ["Name", q.name],
     ["Vehicle", q.vehicle],
@@ -32,7 +32,7 @@ export function quoteMessage(q: QuoteRequest, shopName: string): string {
     .map(([label, value]) => [label, clean(value)] as const)
     .filter(([, value]) => value.length > 0)
     .map(([label, value]) => `${label}: ${value}`);
-  return [`Hi ${shopName}, quote request from your website.`, ...body].join("\n");
+  return [greeting, ...body].join("\n");
 }
 
 /**

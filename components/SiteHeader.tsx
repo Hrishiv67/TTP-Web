@@ -1,17 +1,43 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { NAV, SHOP, oneLine } from "@/lib/business";
+import { HOURS, SHOP, oneLine } from "@/lib/business";
+import { COPY } from "@/lib/copy";
+import { formatRange } from "@/lib/hours";
 import { telHref } from "@/lib/quote";
 import { LiveStatus } from "./LiveStatus";
 import { PhoneIcon } from "./icons";
 
+/**
+ * Fixed header. It is white-on-black while it sits over the tire sequence (or
+ * any element marked data-header="dark") and switches to ink on white after.
+ */
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const [tone, setTone] = useState<"dark" | "light">("dark");
+  const header = useRef<HTMLElement>(null);
   const menuButton = useRef<HTMLButtonElement>(null);
   const firstLink = useRef<HTMLAnchorElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(false);
+
+  useEffect(() => {
+    const update = () => {
+      const h = header.current?.offsetHeight ?? 0;
+      const dark = [...document.querySelectorAll<HTMLElement>("[data-header='dark']")].some((el) => {
+        const r = el.getBoundingClientRect();
+        return r.top <= h / 2 && r.bottom > h / 2;
+      });
+      setTone(dark ? "dark" : "light");
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -42,9 +68,9 @@ export function SiteHeader() {
     if (wasOpen.current) menuButton.current?.focus();
   }, [open]);
 
-  // the overlay only exists below the desktop breakpoint; don't strand it open on resize
+  // the menu only exists below the desktop breakpoint; don't strand it open on resize
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1100px)");
+    const mq = window.matchMedia("(min-width: 1081px)");
     const onChange = () => mq.matches && setOpen(false);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
@@ -52,34 +78,27 @@ export function SiteHeader() {
 
   return (
     <>
-      <aside className="util" aria-label="Shop status and phone">
-        <div className="wrap util__inner">
-          <LiveStatus className="util__status util__status--long" />
-          <LiveStatus compact className="util__status util__status--short" />
-          <p className="util__contact">
-            <span className="util__address">{oneLine(SHOP.address)}</span>
-            <a href={telHref(SHOP.phone.e164)}>{SHOP.phone.display}</a>
-          </p>
-        </div>
-      </aside>
-
-      <header className="masthead">
+      <header ref={header} className="masthead" data-tone={tone}>
         <div className="wrap masthead__inner">
-          <a className="masthead__logo" href="#top" aria-label={`${SHOP.name} — back to top`}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- static vector, no optimisation to gain */}
-            <img src="/logo.svg" alt="" width={1022} height={784} />
+          <a className="masthead__logo" href="#top" aria-label={`${SHOP.name}, back to top`}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- static vector, nothing to optimize */}
+            <img className="logo-dark" src="/logo-reverse.svg" alt="" width={1022} height={784} />
+            {/* eslint-disable-next-line @next/next/no-img-element -- static vector, nothing to optimize */}
+            <img className="logo-light" src="/logo.svg" alt="" width={1022} height={784} />
           </a>
 
           <nav className="masthead__nav" aria-label="Sections">
-            {NAV.map((item) => (
+            {COPY.nav.map((item) => (
               <a key={item.href} href={item.href}>
                 {item.label}
               </a>
             ))}
           </nav>
 
-          <a className="btn btn--red masthead__call" href={telHref(SHOP.phone.e164)}>
-            <PhoneIcon />
+          <LiveStatus compact className="masthead__status" />
+
+          <a className="btn btn--sm masthead__call" href={telHref(SHOP.phone.e164)}>
+            <PhoneIcon size={16} />
             <span>
               <span className="masthead__callWord">Call </span>
               {SHOP.phone.display}
@@ -100,38 +119,30 @@ export function SiteHeader() {
         </div>
       </header>
 
-      <div
-        ref={panel}
-        id="site-menu"
-        className="menu"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Site menu"
-        hidden={!open}
-      >
+      <div ref={panel} id="site-menu" className="menu" role="dialog" aria-modal="true" aria-label="Site menu" hidden={!open}>
         <div className="menu__top">
           {/* eslint-disable-next-line @next/next/no-img-element -- static vector */}
-          <img className="menu__logo" src="/logo-reverse.svg" alt="" width={1022} height={784} />
+          <img className="menu__logo" src="/logo-reverse.svg" alt="" width={1022} height={784} loading="lazy" />
           <button type="button" className="menu__close" onClick={() => setOpen(false)}>
-            Close <span aria-hidden="true">✕</span>
+            Close
           </button>
         </div>
         <nav aria-label="Sections">
-          <ol className="menu__list">
-            {NAV.map((item, i) => (
+          <ul className="menu__list">
+            {COPY.nav.map((item, i) => (
               <li key={item.href}>
                 <a ref={i === 0 ? firstLink : undefined} href={item.href} onClick={() => setOpen(false)}>
-                  <span className="menu__num">{String(i + 1).padStart(2, "0")}</span>
                   {item.label}
                 </a>
               </li>
             ))}
-          </ol>
+          </ul>
         </nav>
         <div className="menu__foot">
+          <LiveStatus />
           <p>{oneLine(SHOP.address)}</p>
-          <p>Mon–Fri 8 AM – 5 PM · Sat–Sun closed</p>
-          <a className="btn btn--red" href={telHref(SHOP.phone.e164)}>
+          <p>Monday to Friday, {formatRange(HOURS[1])}</p>
+          <a className="btn" href={telHref(SHOP.phone.e164)}>
             <PhoneIcon />
             <span>Call {SHOP.phone.display}</span>
           </a>

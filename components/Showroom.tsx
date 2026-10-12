@@ -5,8 +5,9 @@ import Image from "next/image";
 import { SHOP } from "@/lib/business";
 import { COPY } from "@/lib/copy";
 import { telHref } from "@/lib/quote";
-import { BEATS, DEFAULT_SERVICE, PICK_REST, SECTION_SCREENS, SERVICE_REST, SERVICE_END, beatOpacity, isServiceId, type BeatId, type ServiceId } from "./stage/sequence";
+import { BEATS, DEFAULT_SERVICE, INTRO_END, PICK_END, PICK_REST, SECTION_SCREENS, SERVICE_REST, SERVICE_END, beatOpacity, isServiceId, type BeatId, type ServiceId } from "./stage/sequence";
 import type { Showroom as Scene } from "./stage/scene";
+import { smootherstep } from "./stage/shots";
 import { CalendarIcon, PhoneIcon } from "./icons";
 import { KeepTogether } from "./KeepTogether";
 
@@ -30,7 +31,8 @@ function canRunLive() {
 
 /**
  * Scroll controls the logo, picker and service timeline, including playing backward.
- * Choosing a service or returning to the picker uses a short fade, never a fast rewind.
+ * Choosing a service animates the existing move in from the lineup, then waits for
+ * scrolling. Returning to the picker uses a short fade, never a fast rewind.
  * With reduced motion, without WebGL,
  * or before JavaScript runs, it is a single screen over a poster, with the picker
  * linking to the service cards below.
@@ -93,6 +95,7 @@ export function Showroom() {
     let disposed = false;
     let request = 0;
     let fade: Animation | null = null;
+    let cancelEntry = () => {};
     let resolveScene: (scene: Scene | null) => void = () => {};
     const sceneReady = new Promise<Scene | null>((resolve) => { resolveScene = resolve; });
 
@@ -129,6 +132,7 @@ export function Showroom() {
       pin.inert = false;
       section.removeAttribute("aria-busy");
       delete section.dataset.transitioning;
+      delete section.dataset.entering;
     };
     const fadeTo = async (opacity: number) => {
       const from = getComputedStyle(veil).opacity;
@@ -138,12 +142,48 @@ export function Showroom() {
       });
       await fade.finished.catch(() => {});
     };
+    const enterService = () => new Promise<void>((resolve) => {
+      let entryRaf = 0;
+      let elapsed = 0;
+      let lastTime = 0;
+      const from = scene?.progress ?? progress();
+      section.dataset.entering = "true";
+      const finish = () => {
+        cancelAnimationFrame(entryRaf);
+        cancelEntry = () => {};
+        resolve();
+      };
+      cancelEntry = finish;
+      const advance = (now: number) => {
+        if (disposed) return finish();
+        // Limit steps after a dropped frame and pause in hidden tabs. This is
+        // only the move into the service, never automatic service playback.
+        if (document.hidden) lastTime = 0;
+        else {
+          if (lastTime) elapsed += Math.min(100, now - lastTime);
+          lastTime = now;
+          const t = Math.min(1, elapsed / 2800);
+          const P = from + (SERVICE_REST - from) * smootherstep(t);
+          const top = section.getBoundingClientRect().top + window.scrollY;
+          window.scrollTo({ top: top + P * (section.offsetHeight - window.innerHeight), behavior: "instant" });
+          // The entrance already eases acceleration and braking; manual scroll
+          // continues to use the scene's damped tracking afterward.
+          scene?.setProgress(progress(), true);
+          if (!raf && visible) raf = requestAnimationFrame(tick);
+          if (t === 1) return finish();
+        }
+        entryRaf = requestAnimationFrame(advance);
+      };
+      entryRaf = requestAnimationFrame(advance);
+    });
     const navigate = async (destination: Destination, id?: ServiceId) => {
       const ticket = ++request;
+      cancelEntry();
+      fade?.cancel();
+      release();
       section.setAttribute("aria-busy", "true");
       try {
-        // Prepare the selected scene while the current view stays still. Do not
-        // switch services until the black veil covers the old scene and wording.
+        // Prepare the selected scene without replacing the visible lineup.
         const s = destination === "service" ? await sceneReady : scene;
         if (disposed || ticket !== request) return;
         if (destination === "service") {
@@ -152,17 +192,39 @@ export function Showroom() {
           if (disposed || ticket !== request) return;
         }
         pin.inert = true;
-        section.dataset.transitioning = "true";
-        await fadeTo(1);
-        if (disposed || ticket !== request) return;
         if (destination === "service" && s && id) {
+          // A card lower on the page first returns quietly to the lineup. A
+          // picker click stays visible throughout the original camera entrance.
+          const from = progress();
+          if (from < INTRO_END || from >= PICK_END || s.progress >= PICK_END) {
+            section.dataset.transitioning = "true";
+            await fadeTo(1);
+            if (disposed || ticket !== request) return;
+            const top = section.getBoundingClientRect().top + window.scrollY;
+            window.scrollTo({ top: top + PICK_REST * (section.offsetHeight - window.innerHeight), behavior: "instant" });
+            s.setProgress(PICK_REST, true);
+            paint(s.frame());
+            await fadeTo(0);
+            if (disposed || ticket !== request) return;
+            delete section.dataset.transitioning;
+          }
           await s.setService(id);
           if (disposed || ticket !== request) return;
           serviceRef.current = id;
           setService(id);
           setPicked(true);
+          await enterService();
+          if (disposed || ticket !== request) return;
+          release();
+          paint(s.frame());
+          section.querySelector<HTMLElement>("[data-beat='name'] h2")?.focus({ preventScroll: true });
+          kick();
+          return;
         }
-        const P = destination === "service" ? SERVICE_REST : PICK_REST;
+        section.dataset.transitioning = "true";
+        await fadeTo(1);
+        if (disposed || ticket !== request) return;
+        const P = PICK_REST;
         const top = section.getBoundingClientRect().top + window.scrollY;
         window.scrollTo({ top: top + P * (section.offsetHeight - window.innerHeight), behavior: "instant" });
         scene?.setProgress(P, true);
@@ -181,6 +243,7 @@ export function Showroom() {
       } catch (err) {
         if (ticket !== request || disposed) return;
         console.error("Service scene could not load", err);
+        cancelEntry();
         fade?.cancel();
         release();
         kick();
@@ -190,6 +253,7 @@ export function Showroom() {
     const interrupt = () => {
       if (!section.hasAttribute("aria-busy")) return;
       request++;
+      cancelEntry();
       // User input always wins; cancel queued navigation and reveal the current pose.
       fade?.cancel();
       release();
@@ -198,10 +262,14 @@ export function Showroom() {
     const onKey = (event: KeyboardEvent) => {
       if (["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " ", "Escape", "Tab"].includes(event.key)) interrupt();
     };
+    const onPointer = (event: PointerEvent) => {
+      if (event.target instanceof Node && !pin.contains(event.target)) interrupt();
+    };
     const onVisibility = () => { if (!document.hidden) kick(); };
     window.addEventListener("wheel", interrupt, { passive: true });
     window.addEventListener("touchmove", interrupt, { passive: true });
     window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onPointer, { passive: true });
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("scroll", kick, { passive: true });
 
@@ -266,6 +334,7 @@ export function Showroom() {
     return () => {
       disposed = true;
       request++;
+      cancelEntry();
       resolveScene(null);
       fade?.cancel();
       release();
@@ -276,6 +345,7 @@ export function Showroom() {
       window.removeEventListener("wheel", interrupt);
       window.removeEventListener("touchmove", interrupt);
       window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onPointer);
       document.removeEventListener("visibilitychange", onVisibility);
       navigateRef.current = () => {};
       scene?.dispose();

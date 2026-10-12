@@ -68,7 +68,7 @@ const I = (t: number) => t * INTRO_END;
 const S = (s: number) => PICK_END + s * (1 - PICK_END);
 
 export const BEATS = {
-  logo: [-1, 0, I(0.38), I(0.85)] as Window,
+  logo: [-1, 0, I(0.02), I(0.5)] as Window,
   intro: [-1, 0, I(0.06), I(0.2)] as Window,
   bridge: [I(0.42), I(0.52), I(0.78), I(0.9)] as Window,
   pick: [I(0.94), INTRO_END + 0.004, PICK_END - 0.006, S(0.06)] as Window,

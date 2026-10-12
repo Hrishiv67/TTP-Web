@@ -17,6 +17,8 @@ const H = COPY.hero;
 const byId = (id: ServiceId) => H.services.find((s) => s.id === id)!;
 /** Fired by the service cards' "See more" links: play that service in the hero. */
 export const WATCH_EVENT = "ttp:watch";
+/** A "See more" link was pointed at: start building its service. */
+export const PREFETCH_EVENT = "ttp:prefetch";
 
 function canRunLive() {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
@@ -41,7 +43,8 @@ export function Showroom() {
   const sectionRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const navigateRef = useRef<(destination: Destination, id?: ServiceId) => void>(() => {});
-  // start building a service as soon as its button is pointed at, so a tap rarely waits
+  // start building a service when a mouse points at its button or the keyboard reaches it,
+  // so a click rarely waits (not on touch, where the build could hold up the tap itself)
   const prefetchRef = useRef<(id: ServiceId) => void>(() => {});
   const [mode, setMode] = useState<Mode>("auto");
   const [ready, setReady] = useState(false);
@@ -82,8 +85,16 @@ export function Showroom() {
       const id = (e as CustomEvent<string>).detail;
       if (isServiceId(id)) choose(id);
     };
+    const onPrefetch = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (isServiceId(id)) prefetchRef.current(id);
+    };
     window.addEventListener(WATCH_EVENT, onWatch);
-    return () => window.removeEventListener(WATCH_EVENT, onWatch);
+    window.addEventListener(PREFETCH_EVENT, onPrefetch);
+    return () => {
+      window.removeEventListener(WATCH_EVENT, onWatch);
+      window.removeEventListener(PREFETCH_EVENT, onPrefetch);
+    };
   }, [mode, choose]);
 
   useEffect(() => {
@@ -139,11 +150,11 @@ export function Showroom() {
       delete section.dataset.transitioning;
       delete section.dataset.entering;
     };
-    const fadeTo = async (opacity: number) => {
+    const fadeTo = async (opacity: number, duration = 280) => {
       const from = getComputedStyle(veil).opacity;
       fade?.cancel();
       fade = veil.animate([{ opacity: from }, { opacity }], {
-        duration: 280, easing: "ease-in-out", fill: "forwards",
+        duration, easing: "ease-in-out", fill: "forwards",
       });
       await fade.finished.catch(() => {});
     };
@@ -188,25 +199,21 @@ export function Showroom() {
       release();
       section.setAttribute("aria-busy", "true");
       try {
-        // Prepare the selected scene without replacing the visible lineup.
         const s = destination === "service" ? await sceneReady : scene;
         if (disposed || ticket !== request) return;
-        if (destination === "service") {
-          if (!s || !id) {
-            setPending(null);
-            return release();
-          }
-          await s.ensure(id);
-          if (disposed || ticket !== request) return;
+        if (destination === "service" && (!s || !id)) {
+          setPending(null);
+          return release();
         }
         pin.inert = true;
         if (destination === "service" && s && id) {
-          // A card lower on the page first returns quietly to the lineup. A
-          // picker click stays visible throughout the original camera entrance.
+          // A card lower on the page goes straight back to the lineup (the veil is off
+          // screen there, so it darkens at once), where the chosen button is already lit.
+          // A picker click stays put.
           const from = progress();
           if (from < INTRO_END || from >= PICK_END || s.progress >= PICK_END) {
             section.dataset.transitioning = "true";
-            await fadeTo(1);
+            await fadeTo(1, visible ? 280 : 0);
             if (disposed || ticket !== request) return;
             const top = section.getBoundingClientRect().top + window.scrollY;
             window.scrollTo({ top: top + PICK_REST * (section.offsetHeight - window.innerHeight), behavior: "instant" });
@@ -216,6 +223,9 @@ export function Showroom() {
             if (disposed || ticket !== request) return;
             delete section.dataset.transitioning;
           }
+          // Let the lit button paint before the service builds, then build it.
+          await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+          if (disposed || ticket !== request) return;
           await s.setService(id);
           if (disposed || ticket !== request) return;
           serviceRef.current = id;
@@ -468,9 +478,8 @@ export function Showroom() {
                     href={s.id === "ttp" ? "#ttp-tire" : `#svc-${s.id}`}
                     aria-current={pending === s.id || (!pending && picked && service === s.id) ? "true" : undefined}
                     data-loading={pending === s.id || undefined}
-                    onPointerEnter={() => prefetchRef.current(s.id)}
-                    onFocus={() => prefetchRef.current(s.id)}
-                    onTouchStart={() => prefetchRef.current(s.id)}
+                    onPointerEnter={(e) => e.pointerType === "mouse" && prefetchRef.current(s.id)}
+                    onFocus={(e) => e.currentTarget.matches(":focus-visible") && prefetchRef.current(s.id)}
                     onClick={(e) => {
                       if (mode !== "live") return;
                       e.preventDefault();

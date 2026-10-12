@@ -48,7 +48,7 @@ export const COPY = {
     scroll: "Scroll to see what we do",
     bridge: "New tires, used tires and our own TTP Tire, plus the repairs that keep a truck on the road.",
     pickHeading: "Choose your service",
-    pickSub: "Choose a service, then scroll to explore.",
+    pickSub: "Pick one, then scroll to see it up close.",
     choose: "Choose a service",
     continue: "Scroll to continue",
     another: "Choose another service",

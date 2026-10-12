@@ -48,10 +48,9 @@ export const COPY = {
     scroll: "Scroll to see what we do",
     bridge: "New tires, used tires and our own TTP Tire, plus the repairs that keep a truck on the road.",
     pickHeading: "Choose your service",
-    pickSub: "What does your truck need?",
+    pickSub: "Choose a service, then scroll to explore.",
     choose: "Choose a service",
-    pause: "Pause animation",
-    resume: "Continue animation",
+    continue: "Scroll to continue",
     another: "Choose another service",
     // the services in the 3D sequence; ids match components/stage/sequence.ts, and `book`
     // is the name the booking form preselects

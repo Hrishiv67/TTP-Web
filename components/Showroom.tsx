@@ -5,13 +5,13 @@ import Image from "next/image";
 import { SHOP } from "@/lib/business";
 import { COPY } from "@/lib/copy";
 import { telHref } from "@/lib/quote";
-import { BEATS, DEFAULT_SERVICE, PICK_REST, SECTION_SCREENS, SERVICE_START, SERVICE_END, beatOpacity, isServiceId, type BeatId, type ServiceId } from "./stage/sequence";
+import { BEATS, DEFAULT_SERVICE, PICK_REST, SECTION_SCREENS, SERVICE_REST, SERVICE_END, beatOpacity, isServiceId, type BeatId, type ServiceId } from "./stage/sequence";
 import type { Showroom as Scene } from "./stage/scene";
 import { CalendarIcon, PhoneIcon } from "./icons";
 import { KeepTogether } from "./KeepTogether";
 
 type Mode = "auto" | "live" | "static";
-type Playback = "intro" | "service" | "picker" | "resume";
+type Destination = "service" | "picker";
 const H = COPY.hero;
 const byId = (id: ServiceId) => H.services.find((s) => s.id === id)!;
 /** Fired by the service cards' "See more" links: play that service in the hero. */
@@ -29,9 +29,8 @@ function canRunLive() {
 }
 
 /**
- * The hero: the logo leads into the picker, and choosing a service plays its existing
- * scroll timeline automatically. Moving the scroll by hand takes control, including
- * playing it backward. Each service ends on its booking panel.
+ * Scroll controls the logo, picker and service timeline, including playing backward.
+ * Choosing a service or returning to the picker uses a short fade, never a fast rewind.
  * With reduced motion, without WebGL,
  * or before JavaScript runs, it is a single screen over a poster, with the picker
  * linking to the service cards below.
@@ -39,12 +38,7 @@ function canRunLive() {
 export function Showroom() {
   const sectionRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const sceneRef = useRef<Scene | null>(null);
-  const playRef = useRef<(part: Playback) => void>(() => {});
-  const stopRef = useRef<() => void>(() => {});
-  const selectionRef = useRef(0);
-  const interactedRef = useRef(false);
-  const pendingServiceRef = useRef(false);
+  const navigateRef = useRef<(destination: Destination, id?: ServiceId) => void>(() => {});
   const [mode, setMode] = useState<Mode>("auto");
   const [ready, setReady] = useState(false);
   const [service, setService] = useState<ServiceId>(DEFAULT_SERVICE);
@@ -64,27 +58,12 @@ export function Showroom() {
   }, []);
 
   const returnToPicker = useCallback(() => {
-    interactedRef.current = true;
-    pendingServiceRef.current = false;
-    selectionRef.current++;
-    stopRef.current();
-    playRef.current("picker");
+    navigateRef.current("picker");
   }, []);
 
   const choose = useCallback(
     (id: ServiceId) => {
-      stopRef.current();
-      const selection = ++selectionRef.current;
-      interactedRef.current = true;
-      pendingServiceRef.current = true;
-      serviceRef.current = id;
-      setService(id);
-      setPicked(true);
-      sceneRef.current?.setService(id).then(() => {
-        if (selection !== selectionRef.current) return;
-        pendingServiceRef.current = false;
-        playRef.current("service");
-      }).catch((err) => console.error("Service scene could not load", err));
+      navigateRef.current("service", id);
     },
     [],
   );
@@ -103,6 +82,8 @@ export function Showroom() {
   useEffect(() => {
     if (mode !== "live") return;
     const section = sectionRef.current!, canvas = canvasRef.current!;
+    const pin = section.querySelector<HTMLElement>(".show__pin")!;
+    const veil = section.querySelector<HTMLElement>(".show__transition")!;
     const beats = new Map(
       [...section.querySelectorAll<HTMLDivElement>("[data-beat]")].map((el) => [el.dataset.beat as BeatId, el] as const),
     );
@@ -110,141 +91,136 @@ export function Showroom() {
     let raf = 0;
     let visible = true;
     let disposed = false;
-    let playback = 0;
-    let startedAt = 0;
+    let request = 0;
+    let fade: Animation | null = null;
+    let resolveScene: (scene: Scene | null) => void = () => {};
+    const sceneReady = new Promise<Scene | null>((resolve) => { resolveScene = resolve; });
 
     const progress = () => {
       const r = section.getBoundingClientRect();
       const run = r.height - window.innerHeight;
       return run > 0 ? Math.min(1, Math.max(0, -r.top / run)) : 0;
     };
-
     const paint = (P: number) => {
       for (const [id, el] of beats) {
         const o = beatOpacity(BEATS[id], P);
-        const w = BEATS[id];
-        // text drifts up as it arrives and keeps drifting as it leaves
-        const y = P < w[1] ? (1 - o) * 24 : P > w[2] ? -(1 - o) * 24 : 0;
+        // Opacity only: text stays in place instead of bobbing with each scroll step.
         el.style.opacity = o.toFixed(3);
-        el.style.transform = o > 0 && o < 1 ? `translate3d(0, ${y.toFixed(1)}px, 0)` : "";
         const hidden = o < 0.05;
         if (el.dataset.hidden !== String(hidden)) {
           el.dataset.hidden = String(hidden);
           el.inert = hidden;
         }
       }
-      if (P < SERVICE_START || P >= SERVICE_END - 0.01) delete section.dataset.paused;
+      section.toggleAttribute("data-exploring", P >= SERVICE_REST - 0.001 && P < SERVICE_END - 0.01);
     };
-
-    // Animate the actual scroll position: autoplay and manual/reverse scrolling use
-    // exactly the same scene state, so stopping never swaps to a different timeline.
-    const stop = () => {
-      cancelAnimationFrame(playback);
-      playback = 0;
-      delete section.dataset.playing;
-      delete section.dataset.paused;
-    };
-    stopRef.current = stop;
-    const play = (part: Playback) => {
-      stop();
-      const from = progress();
-      const fromY = window.scrollY;
-      const first = part === "resume" ? from : part === "service" ? SERVICE_START : PICK_REST;
-      const approach = part === "resume" ? 0 : part === "intro" ? 4200 : 850;
-      const duration = part === "resume" ? 14000 * Math.max(0, SERVICE_END - from) / (SERVICE_END - SERVICE_START) : part === "service" ? 14000 : 0;
-      startedAt = 0;
-      section.dataset.playing = part === "resume" ? "service" : part;
-      const advance = (now: number) => {
-        if (disposed) return stop();
-        // Freeze the clock while the tab is hidden instead of skipping the animation.
-        if (!startedAt) startedAt = now;
-        const elapsed = now - startedAt;
-        const t = approach ? Math.min(1, elapsed / approach) : 1;
-        const eased = t * t * (3 - 2 * t);
-        const P = elapsed < approach ? from + (first - from) * eased
-          : duration ? first + (SERVICE_END - first) * Math.min(1, (elapsed - approach) / duration) : first;
-        const top = section.getBoundingClientRect().top + window.scrollY;
-        const run = section.offsetHeight - window.innerHeight;
-        const scrollY = elapsed < approach ? fromY + (top + first * run - fromY) * eased : top + P * run;
-        window.scrollTo({ top: scrollY, behavior: "instant" });
-        // Autoplay already eases its approach. Avoid easing a second time, which
-        // makes the scene trail the playback clock on slower devices.
-        scene?.setProgress(progress(), true);
-        if (!raf && visible) raf = requestAnimationFrame(tick);
-        if (elapsed < approach + duration) playback = requestAnimationFrame(advance);
-        else {
-          stop();
-          paint(duration ? SERVICE_END : first);
-          // Keep keyboard focus on a visible control after the picker becomes inert.
-          if (part === "picker" || part === "intro") {
-            if (part === "picker") {
-              const selected = section.querySelector<HTMLAnchorElement>('.show__chip[aria-current="true"]');
-              (selected ?? section.querySelector<HTMLAnchorElement>(".show__chip"))?.focus({ preventScroll: true });
-            }
-          } else section.querySelector<HTMLAnchorElement>("[data-beat='end'] .btn")?.focus({ preventScroll: true });
-        }
-      };
-      playback = requestAnimationFrame(advance);
-    };
-    playRef.current = play;
-    const interrupt = () => {
-      interactedRef.current = true;
-      pendingServiceRef.current = false;
-      selectionRef.current++;
-      const wasService = section.dataset.playing === "service" || section.dataset.paused === "true";
-      stop();
-      if (wasService && progress() >= SERVICE_START && progress() < SERVICE_END - 0.01) section.dataset.paused = "true";
-    };
-    const onPointer = (event: Event) => {
-      // Let playback controls receive their click before changing their visibility.
-      if (event.target instanceof Element && event.target.closest(".show__playback, .show__skip, .show__chip")) return;
-      interrupt();
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " ", "Escape", "Tab"].includes(event.key)) interrupt();
-    };
-    let hiddenAt = 0;
-    const selections = selectionRef;
-    const onVisibility = () => {
-      if (document.hidden) hiddenAt = performance.now();
-      else if (hiddenAt) {
-        if (startedAt) startedAt += performance.now() - hiddenAt;
-        hiddenAt = 0;
-        kick();
-      }
-    };
-    window.addEventListener("wheel", interrupt, { passive: true });
-    window.addEventListener("touchstart", onPointer, { passive: true });
-    window.addEventListener("touchmove", interrupt, { passive: true });
-    window.addEventListener("pointerdown", onPointer, { passive: true });
-    window.addEventListener("keydown", onKey);
-    document.addEventListener("visibilitychange", onVisibility);
-
     const tick = (now: number) => {
       raf = 0;
-      if (!scene || !visible) return;
+      if (!scene || !visible || document.hidden || section.hasAttribute("data-transitioning")) return;
       paint(scene.frame(now));
       if (scene.moving) raf = requestAnimationFrame(tick);
     };
     const kick = () => {
       if (!scene) return paint(progress());
       scene.setProgress(progress());
-      if (!raf && visible) raf = requestAnimationFrame(tick);
+      if (!raf && visible && !document.hidden) raf = requestAnimationFrame(tick);
     };
+    const release = () => {
+      pin.inert = false;
+      section.removeAttribute("aria-busy");
+      delete section.dataset.transitioning;
+    };
+    const fadeTo = async (opacity: number) => {
+      const from = getComputedStyle(veil).opacity;
+      fade?.cancel();
+      fade = veil.animate([{ opacity: from }, { opacity }], {
+        duration: 280, easing: "ease-in-out", fill: "forwards",
+      });
+      await fade.finished.catch(() => {});
+    };
+    const navigate = async (destination: Destination, id?: ServiceId) => {
+      const ticket = ++request;
+      section.setAttribute("aria-busy", "true");
+      try {
+        // Prepare the selected scene while the current view stays still. Do not
+        // switch services until the black veil covers the old scene and wording.
+        const s = destination === "service" ? await sceneReady : scene;
+        if (disposed || ticket !== request) return;
+        if (destination === "service") {
+          if (!s || !id) return release();
+          await s.ensure(id);
+          if (disposed || ticket !== request) return;
+        }
+        pin.inert = true;
+        section.dataset.transitioning = "true";
+        await fadeTo(1);
+        if (disposed || ticket !== request) return;
+        if (destination === "service" && s && id) {
+          await s.setService(id);
+          if (disposed || ticket !== request) return;
+          serviceRef.current = id;
+          setService(id);
+          setPicked(true);
+        }
+        const P = destination === "service" ? SERVICE_REST : PICK_REST;
+        const top = section.getBoundingClientRect().top + window.scrollY;
+        window.scrollTo({ top: top + P * (section.offsetHeight - window.innerHeight), behavior: "instant" });
+        scene?.setProgress(P, true);
+        paint(scene ? scene.frame() : P);
+        // Let React update the selected service text underneath the veil.
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        if (disposed || ticket !== request) return;
+        await fadeTo(0);
+        if (disposed || ticket !== request) return;
+        release();
+        if (destination === "picker") {
+          const selected = section.querySelector<HTMLAnchorElement>('.show__chip[aria-current="true"]');
+          (selected ?? section.querySelector<HTMLAnchorElement>(".show__chip"))?.focus({ preventScroll: true });
+        } else section.querySelector<HTMLElement>("[data-beat='name'] h2")?.focus({ preventScroll: true });
+        kick();
+      } catch (err) {
+        if (ticket !== request || disposed) return;
+        console.error("Service scene could not load", err);
+        fade?.cancel();
+        release();
+        kick();
+      }
+    };
+    navigateRef.current = (destination, id) => { void navigate(destination, id); };
+    const interrupt = () => {
+      if (!section.hasAttribute("aria-busy")) return;
+      request++;
+      // User input always wins; cancel queued navigation and reveal the current pose.
+      fade?.cancel();
+      release();
+      kick();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " ", "Escape", "Tab"].includes(event.key)) interrupt();
+    };
+    const onVisibility = () => { if (!document.hidden) kick(); };
+    window.addEventListener("wheel", interrupt, { passive: true });
+    window.addEventListener("touchmove", interrupt, { passive: true });
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("scroll", kick, { passive: true });
 
-    const io = new IntersectionObserver(([e]) => {
-      visible = e.isIntersecting;
-      if (visible) kick();
+    const io = new IntersectionObserver(([entry]) => {
+      const wasVisible = visible;
+      visible = entry.isIntersecting;
+      if (visible) {
+        // Returning from further down the page should not replay a stale camera move.
+        if (!wasVisible) scene?.setProgress(progress(), true);
+        kick();
+      }
     });
-    io.observe(section);
+    io.observe(canvas);
     const resize = () => {
-      if (!scene) return;
-      scene.resize(canvas.clientWidth, canvas.clientHeight);
+      scene?.resize(canvas.clientWidth, canvas.clientHeight);
       kick();
     };
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
-    window.addEventListener("scroll", kick, { passive: true });
     paint(progress());
 
     (async () => {
@@ -254,7 +230,7 @@ export function Showroom() {
         if (disposed) return;
         const small = Math.min(window.innerWidth, window.innerHeight) < 700;
         const s = await createShowroom(canvas, {
-          pixelRatio: Math.min(window.devicePixelRatio || 1, small ? 1.75 : 2),
+          pixelRatio: Math.min(window.devicePixelRatio || 1, small ? 1.25 : 1.5),
           small,
           font: getComputedStyle(document.body).fontFamily,
         });
@@ -263,25 +239,22 @@ export function Showroom() {
           return;
         }
         scene = s;
-        sceneRef.current = s;
         s.resize(canvas.clientWidth, canvas.clientHeight);
         await s.setService(serviceRef.current);
         s.setProgress(progress(), true);
         paint(s.frame());
-        // reveal once a frame is on the canvas; it matches the poster, so nothing jumps
         requestAnimationFrame(() => !disposed && setReady(true));
         if (process.env.NODE_ENV !== "production") {
           const w = window as unknown as Record<string, unknown>;
           w.__stage = s;
           w.__seq = await import("./stage/sequence");
         }
+        resolveScene(s);
         kick();
-        if (pendingServiceRef.current) {
-          pendingServiceRef.current = false;
-          play("service");
-        } else if (!interactedRef.current && progress() < 0.015 && !window.location.hash) play("intro");
-        s.prebuild().catch((err) => console.warn("Service preloading paused", err));
+        // Remaining services load only when selected, avoiding background shader
+        // compilation and model construction while the visitor is scrolling.
       } catch (err) {
+        resolveScene(null);
         console.error("Hero scene failed, showing the poster instead", err);
         if (!disposed) {
           setMode("static");
@@ -292,25 +265,23 @@ export function Showroom() {
 
     return () => {
       disposed = true;
-      selections.current++;
-      stop();
+      request++;
+      resolveScene(null);
+      fade?.cancel();
+      release();
       cancelAnimationFrame(raf);
       io.disconnect();
       ro.disconnect();
       window.removeEventListener("scroll", kick);
       window.removeEventListener("wheel", interrupt);
-      window.removeEventListener("touchstart", onPointer);
       window.removeEventListener("touchmove", interrupt);
-      window.removeEventListener("pointerdown", onPointer);
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("visibilitychange", onVisibility);
-      playRef.current = () => {};
-      stopRef.current = () => {};
-      sceneRef.current = null;
+      navigateRef.current = () => {};
       scene?.dispose();
+      section.removeAttribute("data-exploring");
       for (const el of beats.values()) {
         el.style.opacity = "";
-        el.style.transform = "";
         el.inert = false;
         delete el.dataset.hidden;
       }
@@ -332,7 +303,7 @@ export function Showroom() {
     >
       {/* without JavaScript nothing can play, so the hero is one screen and the picker links down the page */}
       <noscript>
-        <style>{`.show{height:auto!important}.show .show__pin{position:relative!important;height:auto!important;overflow:visible!important}.show .show__media{inset:0 0 auto!important;height:max(560px,100svh)!important}.show .beat{position:relative!important;opacity:1!important;pointer-events:auto!important}.show .beat--mid,.show .beat--side,.show .beat--logo,.show .show__playback,.show .show__scroll{display:none!important}.show .beat--intro{min-height:max(560px,100svh)!important;visibility:visible!important}`}</style>
+        <style>{`.show{height:auto!important}.show .show__pin{position:relative!important;height:auto!important;overflow:visible!important}.show .show__media{inset:0 0 auto!important;height:max(560px,100svh)!important}.show .beat{position:relative!important;opacity:1!important;pointer-events:auto!important}.show .beat--mid,.show .beat--side,.show .beat--logo,.show .show__guidance,.show .show__transition,.show .show__scroll{display:none!important}.show .beat--intro{min-height:max(560px,100svh)!important;visibility:visible!important}`}</style>
       </noscript>
       <div className="show__pin">
         <div className="show__media">
@@ -346,6 +317,7 @@ export function Showroom() {
 
         <div className="beat beat--logo" data-beat="logo">
           <Image src="/logo-reverse.svg" width={1022} height={784} alt="Truck Tire Pro" className="show__logo" unoptimized priority />
+          <p className="show__continue">{H.continue}</p>
           <button type="button" className="link show__skip" onClick={returnToPicker}>{H.choose}</button>
         </div>
 
@@ -408,7 +380,7 @@ export function Showroom() {
         <div className="beat beat--side" data-beat="name">
           <div className="wrap">
             <div className="show__panel">
-              <h2 className="show__name">{current.name}</h2>
+              <h2 className="show__name" tabIndex={-1}>{current.name}</h2>
               <p className="t-lede">{current.line}</p>
             </div>
           </div>
@@ -425,7 +397,7 @@ export function Showroom() {
         <div className="beat beat--side" data-beat="end">
           <div className="wrap">
             <div className="show__panel">
-              <h2 className="show__name">{current.name}</h2>
+              <h2 className="show__name" tabIndex={-1}>{current.name}</h2>
               <p className="t-lede">{current.line}</p>
               <div className="show__actions">
                 <a className="btn" href={bookHref}>
@@ -439,14 +411,11 @@ export function Showroom() {
             </div>
           </div>
         </div>
-        <div className="show__playback">
-          <button type="button" className="link show__pause" onClick={() => {
-            stopRef.current();
-            if (sectionRef.current) sectionRef.current.dataset.paused = "true";
-          }}>{H.pause}</button>
-          <button type="button" className="link show__resume" onClick={() => playRef.current("resume")}>{H.resume}</button>
+        <div className="show__guidance">
+          <p>{H.continue}</p>
           <button type="button" className="link" onClick={returnToPicker}>{H.another}</button>
         </div>
+        <div className="show__transition" aria-hidden="true" />
       </div>
     </section>
   );

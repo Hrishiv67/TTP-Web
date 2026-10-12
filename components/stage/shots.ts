@@ -77,16 +77,21 @@ export function pulledBack(v: View, by: number): View {
   return { ...v, cam: lerp3(v.tgt, v.cam, by) };
 }
 
-// Catmull-Rom through four points, so a path through several keys bends smoothly
-const cr = (p0: number, p1: number, p2: number, p3: number, t: number) =>
-  0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (3 * p1 - p0 - 3 * p2 + p3) * t * t * t);
-const cr3 = (a: Vec3, b: Vec3, c: Vec3, d: Vec3, t: number): Vec3 => [cr(a[0], b[0], c[0], d[0], t), cr(a[1], b[1], c[1], d[1], t), cr(a[2], b[2], c[2], d[2], t)];
+// Shape-preserving Hermite interpolation respects the time between shots. A
+// camera coordinate cannot overshoot either shot, and "pass" keys share one
+// tangent on both sides instead of changing speed at a key boundary.
+function tangent(before: number, at: number, after: number, h0: number, h1: number) {
+  const d0 = (at - before) / h0, d1 = (after - at) / h1;
+  if (d0 * d1 <= 0) return 0;
+  const w0 = 2 * h1 + h0, w1 = h1 + 2 * h0;
+  return (w0 + w1) / (w0 / d0 + w1 / d1);
+}
 
-// Hermite easing with a chosen start and end speed (0: from or to a halt, 1: moving)
-const hermite = (t: number, s0: number, s1: number) => {
+function curve(a: number, b: number, m0: number, m1: number, span: number, t: number) {
   const t2 = t * t, t3 = t2 * t;
-  return (t3 - 2 * t2 + t) * s0 + (-2 * t3 + 3 * t2) + (t3 - t2) * s1;
-};
+  return (2 * t3 - 3 * t2 + 1) * a + (t3 - 2 * t2 + t) * span * m0
+    + (-2 * t3 + 3 * t2) * b + (t3 - t2) * span * m1;
+}
 
 /** The view at time t on a list of keys (sorted by t), for a poster shape. */
 export function sampleKeys(keys: CameraKey[], t: number, ref: number): View {
@@ -97,16 +102,26 @@ export function sampleKeys(keys: CameraKey[], t: number, ref: number): View {
   while (keys[i + 1].t < t) i++;
   const a = keys[i], b = keys[i + 1];
   const local = (t - a.t) / (b.t - a.t || 1);
-  const e = hermite(local, a.ease === "pass" ? 1 : 0, b.ease === "pass" ? 1 : 0);
   const va = resolve(a, ref), vb = resolve(b, ref);
-  const v0 = i > 0 ? resolve(keys[i - 1], ref) : va;
-  const v3 = i + 2 < keys.length ? resolve(keys[i + 2], ref) : vb;
+  const prev = i > 0 ? keys[i - 1] : null;
+  const next = i + 2 < keys.length ? keys[i + 2] : null;
+  const v0 = prev ? resolve(prev, ref) : va;
+  const v3 = next ? resolve(next, ref) : vb;
+  const span = b.t - a.t;
+  const sample = (p0: number, p1: number, p2: number, p3: number) => {
+    const slope = (p2 - p1) / span;
+    const m0 = a.ease === "pass" ? (prev ? tangent(p0, p1, p2, a.t - prev.t, span) : slope) : 0;
+    const m1 = b.ease === "pass" ? (next ? tangent(p1, p2, p3, span, next.t - b.t) : slope) : 0;
+    return curve(p1, p2, m0, m1, span, local);
+  };
+  const vector = (p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3): Vec3 =>
+    [sample(p0[0], p1[0], p2[0], p3[0]), sample(p0[1], p1[1], p2[1], p3[1]), sample(p0[2], p1[2], p2[2], p3[2])];
   return {
-    cam: cr3(v0.cam, va.cam, vb.cam, v3.cam, e),
-    tgt: cr3(v0.tgt, va.tgt, vb.tgt, v3.tgt, e),
-    fov: lerp(va.fov, vb.fov, e),
-    shift: lerp(va.shift, vb.shift, e),
-    lift: lerp(va.lift, vb.lift, e),
+    cam: vector(v0.cam, va.cam, vb.cam, v3.cam),
+    tgt: vector(v0.tgt, va.tgt, vb.tgt, v3.tgt),
+    fov: sample(v0.fov, va.fov, vb.fov, v3.fov),
+    shift: sample(v0.shift, va.shift, vb.shift, v3.shift),
+    lift: sample(v0.lift, va.lift, vb.lift, v3.lift),
   };
 }
 

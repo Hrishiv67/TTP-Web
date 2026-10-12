@@ -56,6 +56,8 @@ export function phaseAt(P: number): Phase {
 export const progressFor = (u: number) => PICK_END + (SERVICE_IN + u * (1 - SERVICE_IN - SERVICE_HOLD)) * (1 - PICK_END);
 /** Scroll progress where a service starts (just after the pick hold). */
 export const SERVICE_START = PICK_END + 0.004;
+/** First service pose: choosing a service lands here, then the visitor scrolls. */
+export const SERVICE_REST = PICK_END + SERVICE_IN * (1 - PICK_END);
 /** A completed service with its booking panel fully visible, still inside the pin. */
 export const SERVICE_END = 0.965;
 
@@ -70,7 +72,7 @@ export const BEATS = {
   intro: [-1, 0, I(0.06), I(0.2)] as Window,
   bridge: [I(0.42), I(0.52), I(0.78), I(0.9)] as Window,
   pick: [I(0.94), INTRO_END + 0.004, PICK_END - 0.006, S(0.06)] as Window,
-  name: [S(0.13), S(0.18), S(0.44), S(0.49)] as Window,
+  name: [S(0.12), S(0.14), S(0.44), S(0.49)] as Window,
   detail: [S(0.52), S(0.57), S(0.82), S(0.86)] as Window,
   end: [S(0.88), S(0.92), 2, 3] as Window,
 } satisfies Record<string, Window>;

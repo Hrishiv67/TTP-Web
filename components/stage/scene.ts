@@ -14,9 +14,9 @@ import {
 import { POSTER_ASPECT, clamp01, lerp, mixViews, posterRegime, pulledBack, sampleKeys, smootherstep, type View } from "./shots";
 import { ON_LINEUP, SERVICES } from "./services";
 import type { ServiceContext, ServiceSet, TireHandle } from "./services/types";
+import { advanceScroll } from "./scrollMotion";
 
 const nextTask = () => new Promise<void>((r) => setTimeout(r, 0));
-const EASE = 7; // how quickly the drawn progress catches up with the scroll, per second
 const BACK = 4.2; // how far a tire out of focus backs away into the dark, meters
 
 export type Showroom = Awaited<ReturnType<typeof createShowroom>>;
@@ -60,7 +60,7 @@ export async function createShowroom(
 
   const sets = new Map<ServiceId, LoadedSet>();
   const pending = new Map<ServiceId, Promise<void>>();
-  const state = { target: 0, current: 0, service: DEFAULT_SERVICE as ServiceId, w: 1, h: 1, dirty: true };
+  const state = { target: 0, current: 0, velocity: 0, service: DEFAULT_SERVICE as ServiceId, w: 1, h: 1, dirty: true };
   let active: LoadedSet | null = null; // the set whose props are out of their resting state
 
   /** Load and build a service (once), and compile its shaders before it first shows. */
@@ -189,7 +189,11 @@ export async function createShowroom(
     /** Point the scene at a scroll progress; `immediate` jumps there instead of easing. */
     setProgress(P: number, immediate = false) {
       state.target = P;
-      if (immediate) state.current = P;
+      if (immediate) {
+        state.current = P;
+        state.velocity = 0;
+        last = performance.now();
+      }
       state.dirty = true;
     },
     get progress() {
@@ -197,7 +201,7 @@ export async function createShowroom(
     },
     /** True while frames are needed: the drawn progress is still catching up, or something changed. */
     get moving() {
-      return state.dirty || Math.abs(state.target - state.current) > 1e-5;
+      return state.dirty || state.current !== state.target || state.velocity !== 0;
     },
     get service() {
       return state.service;
@@ -229,10 +233,11 @@ export async function createShowroom(
     },
     /** Advance the easing and draw. Returns the progress the frame was drawn at. */
     frame(now = performance.now()) {
-      const dt = Math.min(0.05, (now - last) / 1000);
+      const dt = (now - last) / 1000;
       last = now;
-      state.current += (state.target - state.current) * (1 - Math.exp(-dt * EASE));
-      if (Math.abs(state.target - state.current) < 1e-5) state.current = state.target;
+      const motion = advanceScroll({ value: state.current, velocity: state.velocity }, state.target, dt);
+      state.current = motion.value;
+      state.velocity = motion.velocity;
       state.dirty = false;
       apply(state.current);
       renderer.render(scene, camera);

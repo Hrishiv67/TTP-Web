@@ -1,15 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { SHOP } from "@/lib/business";
 import { COPY } from "@/lib/copy";
 import { telHref } from "@/lib/quote";
-import { BEATS, DEFAULT_SERVICE, PICK_REST, SECTION_SCREENS, SERVICE_START, beatOpacity, isServiceId, type BeatId, type ServiceId } from "./stage/sequence";
+import { BEATS, DEFAULT_SERVICE, PICK_REST, SECTION_SCREENS, SERVICE_START, SERVICE_END, beatOpacity, isServiceId, type BeatId, type ServiceId } from "./stage/sequence";
 import type { Showroom as Scene } from "./stage/scene";
 import { CalendarIcon, PhoneIcon } from "./icons";
 import { KeepTogether } from "./KeepTogether";
 
 type Mode = "auto" | "live" | "static";
+type Playback = "intro" | "service" | "picker" | "resume";
 const H = COPY.hero;
 const byId = (id: ServiceId) => H.services.find((s) => s.id === id)!;
 /** Fired by the service cards' "See more" links: play that service in the hero. */
@@ -27,10 +29,10 @@ function canRunLive() {
 }
 
 /**
- * The hero: a scroll-driven 3D sequence. The section pins to the screen; scrolling
- * plays an intro (the three tires coming up out of the dark), holds on a picker, then
- * plays the chosen service's animation (TTP Tire if nobody picks) and ends on a booking
- * panel. The text fades in and out with the scroll. With reduced motion, without WebGL,
+ * The hero: the logo leads into the picker, and choosing a service plays its existing
+ * scroll timeline automatically. Moving the scroll by hand takes control, including
+ * playing it backward. Each service ends on its booking panel.
+ * With reduced motion, without WebGL,
  * or before JavaScript runs, it is a single screen over a poster, with the picker
  * linking to the service cards below.
  */
@@ -38,7 +40,11 @@ export function Showroom() {
   const sectionRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<Scene | null>(null);
-  const kickRef = useRef<() => void>(() => {});
+  const playRef = useRef<(part: Playback) => void>(() => {});
+  const stopRef = useRef<() => void>(() => {});
+  const selectionRef = useRef(0);
+  const interactedRef = useRef(false);
+  const pendingServiceRef = useRef(false);
   const [mode, setMode] = useState<Mode>("auto");
   const [ready, setReady] = useState(false);
   const [service, setService] = useState<ServiceId>(DEFAULT_SERVICE);
@@ -46,31 +52,41 @@ export function Showroom() {
   const [picked, setPicked] = useState(false);
 
   useEffect(() => {
-    const live = canRunLive();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- depends on browser capabilities, unknown during SSR
-    setMode(live ? "live" : "static");
-    document.documentElement.dataset.stage = live ? "live" : "static";
+    const update = () => {
+      const live = canRunLive();
+      setMode(live ? "live" : "static");
+      document.documentElement.dataset.stage = live ? "live" : "static";
+    };
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    update();
+    motion.addEventListener("change", update);
+    return () => motion.removeEventListener("change", update);
   }, []);
 
-  /** Scroll so the pinned section is at progress P. */
-  const scrollToProgress = useCallback((P: number) => {
-    const section = sectionRef.current;
-    if (!section) return;
-    const top = section.getBoundingClientRect().top + window.scrollY;
-    const run = section.offsetHeight - window.innerHeight;
-    window.scrollTo({ top: top + P * run, behavior: "smooth" });
+  const returnToPicker = useCallback(() => {
+    interactedRef.current = true;
+    pendingServiceRef.current = false;
+    selectionRef.current++;
+    stopRef.current();
+    playRef.current("picker");
   }, []);
 
   const choose = useCallback(
-    (id: ServiceId, scroll = true) => {
+    (id: ServiceId) => {
+      stopRef.current();
+      const selection = ++selectionRef.current;
+      interactedRef.current = true;
+      pendingServiceRef.current = true;
       serviceRef.current = id;
       setService(id);
       setPicked(true);
-      sceneRef.current?.setService(id).then(() => kickRef.current());
-      kickRef.current();
-      if (scroll) scrollToProgress(SERVICE_START);
+      sceneRef.current?.setService(id).then(() => {
+        if (selection !== selectionRef.current) return;
+        pendingServiceRef.current = false;
+        playRef.current("service");
+      }).catch((err) => console.error("Service scene could not load", err));
     },
-    [scrollToProgress],
+    [],
   );
 
   // the cards further down the page play their service here
@@ -94,6 +110,8 @@ export function Showroom() {
     let raf = 0;
     let visible = true;
     let disposed = false;
+    let playback = 0;
+    let startedAt = 0;
 
     const progress = () => {
       const r = section.getBoundingClientRect();
@@ -115,7 +133,92 @@ export function Showroom() {
           el.inert = hidden;
         }
       }
+      if (P < SERVICE_START || P >= SERVICE_END - 0.01) delete section.dataset.paused;
     };
+
+    // Animate the actual scroll position: autoplay and manual/reverse scrolling use
+    // exactly the same scene state, so stopping never swaps to a different timeline.
+    const stop = () => {
+      cancelAnimationFrame(playback);
+      playback = 0;
+      delete section.dataset.playing;
+      delete section.dataset.paused;
+    };
+    stopRef.current = stop;
+    const play = (part: Playback) => {
+      stop();
+      const from = progress();
+      const fromY = window.scrollY;
+      const first = part === "resume" ? from : part === "service" ? SERVICE_START : PICK_REST;
+      const approach = part === "resume" ? 0 : part === "intro" ? 4200 : 850;
+      const duration = part === "resume" ? 14000 * Math.max(0, SERVICE_END - from) / (SERVICE_END - SERVICE_START) : part === "service" ? 14000 : 0;
+      startedAt = 0;
+      section.dataset.playing = part === "resume" ? "service" : part;
+      const advance = (now: number) => {
+        if (disposed) return stop();
+        // Freeze the clock while the tab is hidden instead of skipping the animation.
+        if (!startedAt) startedAt = now;
+        const elapsed = now - startedAt;
+        const t = approach ? Math.min(1, elapsed / approach) : 1;
+        const eased = t * t * (3 - 2 * t);
+        const P = elapsed < approach ? from + (first - from) * eased
+          : duration ? first + (SERVICE_END - first) * Math.min(1, (elapsed - approach) / duration) : first;
+        const top = section.getBoundingClientRect().top + window.scrollY;
+        const run = section.offsetHeight - window.innerHeight;
+        const scrollY = elapsed < approach ? fromY + (top + first * run - fromY) * eased : top + P * run;
+        window.scrollTo({ top: scrollY, behavior: "instant" });
+        // Autoplay already eases its approach. Avoid easing a second time, which
+        // makes the scene trail the playback clock on slower devices.
+        scene?.setProgress(progress(), true);
+        if (!raf && visible) raf = requestAnimationFrame(tick);
+        if (elapsed < approach + duration) playback = requestAnimationFrame(advance);
+        else {
+          stop();
+          paint(duration ? SERVICE_END : first);
+          // Keep keyboard focus on a visible control after the picker becomes inert.
+          if (part === "picker" || part === "intro") {
+            if (part === "picker") {
+              const selected = section.querySelector<HTMLAnchorElement>('.show__chip[aria-current="true"]');
+              (selected ?? section.querySelector<HTMLAnchorElement>(".show__chip"))?.focus({ preventScroll: true });
+            }
+          } else section.querySelector<HTMLAnchorElement>("[data-beat='end'] .btn")?.focus({ preventScroll: true });
+        }
+      };
+      playback = requestAnimationFrame(advance);
+    };
+    playRef.current = play;
+    const interrupt = () => {
+      interactedRef.current = true;
+      pendingServiceRef.current = false;
+      selectionRef.current++;
+      const wasService = section.dataset.playing === "service" || section.dataset.paused === "true";
+      stop();
+      if (wasService && progress() >= SERVICE_START && progress() < SERVICE_END - 0.01) section.dataset.paused = "true";
+    };
+    const onPointer = (event: Event) => {
+      // Let playback controls receive their click before changing their visibility.
+      if (event.target instanceof Element && event.target.closest(".show__playback, .show__skip, .show__chip")) return;
+      interrupt();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " ", "Escape", "Tab"].includes(event.key)) interrupt();
+    };
+    let hiddenAt = 0;
+    const selections = selectionRef;
+    const onVisibility = () => {
+      if (document.hidden) hiddenAt = performance.now();
+      else if (hiddenAt) {
+        if (startedAt) startedAt += performance.now() - hiddenAt;
+        hiddenAt = 0;
+        kick();
+      }
+    };
+    window.addEventListener("wheel", interrupt, { passive: true });
+    window.addEventListener("touchstart", onPointer, { passive: true });
+    window.addEventListener("touchmove", interrupt, { passive: true });
+    window.addEventListener("pointerdown", onPointer, { passive: true });
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("visibilitychange", onVisibility);
 
     const tick = (now: number) => {
       raf = 0;
@@ -128,7 +231,6 @@ export function Showroom() {
       scene.setProgress(progress());
       if (!raf && visible) raf = requestAnimationFrame(tick);
     };
-    kickRef.current = kick;
 
     const io = new IntersectionObserver(([e]) => {
       visible = e.isIntersecting;
@@ -174,7 +276,11 @@ export function Showroom() {
           w.__seq = await import("./stage/sequence");
         }
         kick();
-        s.prebuild();
+        if (pendingServiceRef.current) {
+          pendingServiceRef.current = false;
+          play("service");
+        } else if (!interactedRef.current && progress() < 0.015 && !window.location.hash) play("intro");
+        s.prebuild().catch((err) => console.warn("Service preloading paused", err));
       } catch (err) {
         console.error("Hero scene failed, showing the poster instead", err);
         if (!disposed) {
@@ -186,11 +292,20 @@ export function Showroom() {
 
     return () => {
       disposed = true;
+      selections.current++;
+      stop();
       cancelAnimationFrame(raf);
       io.disconnect();
       ro.disconnect();
       window.removeEventListener("scroll", kick);
-      kickRef.current = () => {};
+      window.removeEventListener("wheel", interrupt);
+      window.removeEventListener("touchstart", onPointer);
+      window.removeEventListener("touchmove", interrupt);
+      window.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("visibilitychange", onVisibility);
+      playRef.current = () => {};
+      stopRef.current = () => {};
       sceneRef.current = null;
       scene?.dispose();
       for (const el of beats.values()) {
@@ -217,7 +332,7 @@ export function Showroom() {
     >
       {/* without JavaScript nothing can play, so the hero is one screen and the picker links down the page */}
       <noscript>
-        <style>{`.show{height:auto!important}.show .show__pin{position:relative!important;height:auto!important;overflow:visible!important}.show .show__media{inset:0 0 auto!important;height:max(560px,100svh)!important}.show .beat{position:relative!important;opacity:1!important;pointer-events:auto!important}.show .beat--mid,.show .beat--side,.show .show__scroll{display:none!important}.show .beat--intro{min-height:max(560px,100svh)!important}`}</style>
+        <style>{`.show{height:auto!important}.show .show__pin{position:relative!important;height:auto!important;overflow:visible!important}.show .show__media{inset:0 0 auto!important;height:max(560px,100svh)!important}.show .beat{position:relative!important;opacity:1!important;pointer-events:auto!important}.show .beat--mid,.show .beat--side,.show .beat--logo,.show .show__playback,.show .show__scroll{display:none!important}.show .beat--intro{min-height:max(560px,100svh)!important;visibility:visible!important}`}</style>
       </noscript>
       <div className="show__pin">
         <div className="show__media">
@@ -227,6 +342,11 @@ export function Showroom() {
             <img src="/stage/hero-intro-wide.webp" alt={H.posterAlt} width={2400} height={1500} fetchPriority="high" decoding="async" />
           </picture>
           {mode === "live" && <canvas ref={canvasRef} className="show__canvas" aria-hidden="true" />}
+        </div>
+
+        <div className="beat beat--logo" data-beat="logo">
+          <Image src="/logo-reverse.svg" width={1022} height={784} alt="Truck Tire Pro" className="show__logo" unoptimized priority />
+          <button type="button" className="link show__skip" onClick={returnToPicker}>{H.choose}</button>
         </div>
 
         <div className="beat beat--top beat--intro" data-beat="intro">
@@ -312,12 +432,20 @@ export function Showroom() {
                   <CalendarIcon />
                   <span>{COPY.cta.book}</span>
                 </a>
-                <button type="button" className="link" onClick={() => scrollToProgress(PICK_REST)}>
+                <button type="button" className="link" onClick={returnToPicker}>
                   {H.another}
                 </button>
               </div>
             </div>
           </div>
+        </div>
+        <div className="show__playback">
+          <button type="button" className="link show__pause" onClick={() => {
+            stopRef.current();
+            if (sectionRef.current) sectionRef.current.dataset.paused = "true";
+          }}>{H.pause}</button>
+          <button type="button" className="link show__resume" onClick={() => playRef.current("resume")}>{H.resume}</button>
+          <button type="button" className="link" onClick={returnToPicker}>{H.another}</button>
         </div>
       </div>
     </section>

@@ -56,6 +56,8 @@ export function phaseAt(P: number): Phase {
 export const progressFor = (u: number) => PICK_END + (SERVICE_IN + u * (1 - SERVICE_IN - SERVICE_HOLD)) * (1 - PICK_END);
 /** Scroll progress where a service starts (just after the pick hold). */
 export const SERVICE_START = PICK_END + 0.004;
+/** A completed service with its booking panel fully visible, still inside the pin. */
+export const SERVICE_END = 0.965;
 
 // ------------------------------------------------------------------ text
 /** When a block of text shows: [starts fading in, fully in, starts fading out, gone]. */
@@ -64,6 +66,7 @@ const I = (t: number) => t * INTRO_END;
 const S = (s: number) => PICK_END + s * (1 - PICK_END);
 
 export const BEATS = {
+  logo: [-1, 0, I(0.38), I(0.85)] as Window,
   intro: [-1, 0, I(0.06), I(0.2)] as Window,
   bridge: [I(0.42), I(0.52), I(0.78), I(0.9)] as Window,
   pick: [I(0.94), INTRO_END + 0.004, PICK_END - 0.006, S(0.06)] as Window,

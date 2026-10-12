@@ -165,11 +165,11 @@ const service: ServiceFactory = async (ctx) => {
     });
 
     // crayon: comes down to the ring, goes round once, lifts away
-    const draw = ramp(u, 0.79, 0.9);
+    const draw = ramp(u, 0.79, 0.87);
     ring.visible = draw > 0;
     ringGeo.setDrawRange(0, Math.round(draw * 72) * 36);
-    crayon.visible = u > 0.77 && u < 0.94;
-    const down = ramp(u, 0.77, 0.79), lift = ramp(u, 0.9, 0.94);
+    crayon.visible = u > 0.77 && u < 0.905;
+    const down = ramp(u, 0.77, 0.79), lift = ramp(u, 0.87, 0.905);
     const ang = draw * Math.PI * 2;
     crayon.position.set(RING * Math.cos(ang), 0.0012 + (1 - down) * 0.06 + lift * 0.08, -RING * Math.sin(ang));
     crayon.rotation.set(0.5, 0, -0.45);
@@ -206,7 +206,9 @@ const service: ServiceFactory = async (ctx) => {
       { t: 0.5, cam: w(0.07, 0.1, -0.26), tgt: w(0, 0.016, 0), fov: 30, frame: FRAMES.close, ease: "pass" },
       { t: 0.76, cam: w(0.03, 0.11, -0.25), tgt: w(0, 0.01, 0), fov: 30, frame: FRAMES.close },
       // up over the repair to see the crayon go round
-      { t: 0.86, cam: w(0.05, 0.21, -0.17), tgt: p, fov: 30, frame: FRAMES.close },
+      { t: 0.84, cam: w(0.05, 0.21, -0.17), tgt: p, fov: 30, frame: FRAMES.close },
+      // a moment on the finished repair before pulling back
+      { t: 0.92, cam: w(0.045, 0.215, -0.16), tgt: p, fov: 30, frame: FRAMES.close },
       { t: 1, cam: [X + 1.0, 0.86, 2.2], tgt: [X - 0.04, 0.56, 0.12], fov: 30, frame: FRAMES.right },
     ],
     pose: (u) => ({ yaw: YAW - ramp(u, 0.9, 1) * 0.3, roll: ROLL }),

@@ -364,7 +364,9 @@ function sidewallTexture(outPts: THREE.Vector2[], length: number, kind: TireKind
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#fff";
-    ctx.fillText(text, 0, 0);
+    // the texture wraps round the tire, so lettering that crosses the seam is drawn on both sides of it
+    const wrapPx = W / (mPerPxY / mPerPxX);
+    for (const dx of [-wrapPx, 0, wrapPx]) ctx.fillText(text, dx, 0);
     ctx.restore();
   };
   for (const off of [0, 0.5]) {
@@ -374,7 +376,9 @@ function sidewallTexture(outPts: THREE.Vector2[], length: number, kind: TireKind
     label("TUBELESS", 0.37, (u - 0.11 + 1) % 1, 0.014, 700);
     label("STEEL BELTED RADIAL", 0.44, u % 1, 0.013, 700);
     label(kind === "drive" ? "M+S" : "REGROOVABLE", 0.44, (u + 0.16) % 1, 0.012, 700);
-    label("DOT  TT4R  2026", 0.355, (u + 0.28) % 1, 0.011, 700);
+    // on a branded tire the DOT code moves inward and round, clear of the ply rating under the brand
+    if (brand) label("DOT  TT4R  2026", 0.34, (u + 0.36) % 1, 0.011, 700);
+    else label("DOT  TT4R  2026", 0.355, (u + 0.28) % 1, 0.011, 700);
   }
   // the shop's own brand, between the size markings, upright at the top when the tire hasn't rolled
   if (brand) {

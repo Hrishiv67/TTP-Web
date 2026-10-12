@@ -13,7 +13,7 @@ export function TtpTire() {
         <div className="tires__grid">
           <div className="tires__media" data-reveal>
             {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized render, already compressed */}
-            <img src="/services/ttp.webp" alt={t.alt} width={1200} height={1200} loading="lazy" decoding="async" />
+            <img src="/services/ttp.webp" alt={t.alt} width={1000} height={1000} loading="lazy" decoding="async" />
           </div>
           <div className="tires__body" data-reveal>
             <p className="tires__kicker">{t.kicker}</p>

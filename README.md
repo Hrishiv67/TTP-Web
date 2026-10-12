@@ -77,6 +77,8 @@ Things worth re-checking with the shop before launch:
 A scroll-driven sequence in a black studio. The section pins to the screen and the
 scroll plays it, in three parts (`components/stage/sequence.ts`):
 
+It opens on the logo with the headline, the hours and the booking buttons, then:
+
 1. **Intro**: the three tires (a new TTP Tire, a used tire, a trailer tire) come up out
    of the dark while the camera swings round.
 2. **Pick**: a hold on the lineup with a button for each service.
@@ -89,7 +91,10 @@ Everything is generated in the browser from code; there are no model files or vi
 - `components/Showroom.tsx` pins the section, feeds the scene the scroll position, and
   fades the text in and out.
 - `components/stage/scene.ts` is the scene: the lineup, the move from the lineup into a
-  service, and loading each service when it's needed.
+  service, and loading each service when it's needed (a service starts loading as soon
+  as its button is pointed at or focused).
+- `components/stage/scrollMotion.ts` is how the scene follows the scroll: a damped
+  spring with a speed limit, so a hard flick can't skip through an animation.
 - `components/stage/services/` has one file per service. Each one builds its props and
   describes its camera moves and animation as a function of how far the scroll has got
   (`services/types.ts` explains the contract; `repair.ts` is a readable example).

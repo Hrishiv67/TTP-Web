@@ -41,11 +41,15 @@ export function Showroom() {
   const sectionRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const navigateRef = useRef<(destination: Destination, id?: ServiceId) => void>(() => {});
+  // start building a service as soon as its button is pointed at, so a tap rarely waits
+  const prefetchRef = useRef<(id: ServiceId) => void>(() => {});
   const [mode, setMode] = useState<Mode>("auto");
   const [ready, setReady] = useState(false);
   const [service, setService] = useState<ServiceId>(DEFAULT_SERVICE);
   const serviceRef = useRef<ServiceId>(DEFAULT_SERVICE); // the same, for the scene while it loads
   const [picked, setPicked] = useState(false);
+  // a service that was chosen and is still loading: its button shows it right away
+  const [pending, setPending] = useState<ServiceId | null>(null);
 
   useEffect(() => {
     const update = () => {
@@ -65,6 +69,7 @@ export function Showroom() {
 
   const choose = useCallback(
     (id: ServiceId) => {
+      setPending(id);
       navigateRef.current("service", id);
     },
     [],
@@ -187,7 +192,10 @@ export function Showroom() {
         const s = destination === "service" ? await sceneReady : scene;
         if (disposed || ticket !== request) return;
         if (destination === "service") {
-          if (!s || !id) return release();
+          if (!s || !id) {
+            setPending(null);
+            return release();
+          }
           await s.ensure(id);
           if (disposed || ticket !== request) return;
         }
@@ -213,6 +221,7 @@ export function Showroom() {
           serviceRef.current = id;
           setService(id);
           setPicked(true);
+          setPending(null);
           await enterService();
           if (disposed || ticket !== request) return;
           release();
@@ -246,10 +255,14 @@ export function Showroom() {
         cancelEntry();
         fade?.cancel();
         release();
+        setPending(null);
         kick();
       }
     };
     navigateRef.current = (destination, id) => { void navigate(destination, id); };
+    prefetchRef.current = (id) => {
+      void sceneReady.then((s) => s?.ensure(id)).catch(() => {});
+    };
     const interrupt = () => {
       if (!section.hasAttribute("aria-busy")) return;
       request++;
@@ -257,6 +270,7 @@ export function Showroom() {
       // User input always wins; cancel queued navigation and reveal the current pose.
       fade?.cancel();
       release();
+      setPending(null);
       kick();
     };
     const onKey = (event: KeyboardEvent) => {
@@ -348,6 +362,7 @@ export function Showroom() {
       window.removeEventListener("pointerdown", onPointer);
       document.removeEventListener("visibilitychange", onVisibility);
       navigateRef.current = () => {};
+      prefetchRef.current = () => {};
       scene?.dispose();
       section.removeAttribute("data-exploring");
       for (const el of beats.values()) {
@@ -385,10 +400,29 @@ export function Showroom() {
           {mode === "live" && <canvas ref={canvasRef} className="show__canvas" aria-hidden="true" />}
         </div>
 
+        {/* the opening screen of the live sequence: the logo, what the shop is, and how to book */}
         <div className="beat beat--logo" data-beat="logo">
-          <Image src="/logo-reverse.svg" width={1022} height={784} alt="Truck Tire Pro" className="show__logo" unoptimized priority />
-          <p className="show__continue">{H.continue}</p>
-          <button type="button" className="link show__skip" onClick={returnToPicker}>{H.choose}</button>
+          <div className="show__welcome">
+            <Image src="/logo-reverse.svg" width={1022} height={784} alt="Truck Tire Pro" className="show__logo" unoptimized priority />
+            <h1 className="show__headline">
+              <KeepTogether text={H.headline} />
+            </h1>
+            <p className="show__hours">{H.hours}</p>
+            <div className="show__actions">
+              <a className="btn" href="/book">
+                <CalendarIcon />
+                <span>{COPY.cta.book}</span>
+              </a>
+              <a className="btn btn--line" href={telHref(SHOP.phone.e164)} aria-label={`${COPY.cta.quote}: call ${SHOP.phone.display}`}>
+                <PhoneIcon />
+                <span>{COPY.cta.quote}</span>
+              </a>
+            </div>
+          </div>
+          <div className="show__next">
+            <p className="show__continue">{H.continue}</p>
+            <button type="button" className="link show__skip" onClick={returnToPicker}>{H.choose}</button>
+          </div>
         </div>
 
         <div className="beat beat--top beat--intro" data-beat="intro">
@@ -432,7 +466,11 @@ export function Showroom() {
                   <a
                     className="show__chip"
                     href={s.id === "ttp" ? "#ttp-tire" : `#svc-${s.id}`}
-                    aria-current={picked && service === s.id ? "true" : undefined}
+                    aria-current={pending === s.id || (!pending && picked && service === s.id) ? "true" : undefined}
+                    data-loading={pending === s.id || undefined}
+                    onPointerEnter={() => prefetchRef.current(s.id)}
+                    onFocus={() => prefetchRef.current(s.id)}
+                    onTouchStart={() => prefetchRef.current(s.id)}
                     onClick={(e) => {
                       if (mode !== "live") return;
                       e.preventDefault();

@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { createStudio, makeDimmable } from "./studio";
 import { makeMaterials, makeTire, type TireOptions } from "./tireModel";
 import {
-  DEFAULT_SERVICE, INTRO_KEYS, LINEUP, LINEUP_YAW, SERVICE_IDS, TIRES, introLight, introYaw, phaseAt,
+  DEFAULT_SERVICE, INTRO_KEYS, LINEUP, LINEUP_YAW, TIRES, introLight, introYaw, phaseAt,
   type ServiceId, type TireId, type TireKind,
 } from "./sequence";
 import { POSTER_ASPECT, clamp01, lerp, mixViews, posterRegime, pulledBack, sampleKeys, smootherstep, type View } from "./shots";
@@ -216,14 +216,8 @@ export async function createShowroom(
         state.dirty = true;
       });
     },
+    /** Build a service ahead of time (when its button is pointed at, say). */
     ensure,
-    /** Build the remaining services one at a time, so a pick never waits. */
-    async prebuild() {
-      for (const id of SERVICE_IDS) {
-        await new Promise<void>((r) => ("requestIdleCallback" in window ? requestIdleCallback(() => r(), { timeout: 1500 }) : setTimeout(r, 200)));
-        await ensure(id);
-      }
-    },
     resize(w: number, h: number) {
       state.w = view.w = w;
       state.h = view.h = h;

@@ -107,6 +107,7 @@ export function Showroom() {
     );
     let scene: Scene | null = null;
     let raf = 0;
+    let preloadTimer = 0;
     let visible = true;
     let disposed = false;
     let request = 0;
@@ -162,7 +163,9 @@ export function Showroom() {
       let entryRaf = 0;
       let elapsed = 0;
       let lastTime = 0;
-      const from = scene?.progress ?? progress();
+      // The picker is a hold, so skip that stationary part of the scroll range.
+      // The first frame after choosing a service starts its existing camera move.
+      const from = Math.max(PICK_END, scene?.progress ?? progress());
       section.dataset.entering = "true";
       const finish = () => {
         cancelAnimationFrame(entryRaf);
@@ -172,13 +175,13 @@ export function Showroom() {
       cancelEntry = finish;
       const advance = (now: number) => {
         if (disposed) return finish();
-        // Limit steps after a dropped frame and pause in hidden tabs. This is
-        // only the move into the service, never automatic service playback.
+        // Pause in hidden tabs, but count real time between visible frames. A
+        // slow device must not stretch a short entrance into a long wait.
         if (document.hidden) lastTime = 0;
         else {
-          if (lastTime) elapsed += Math.min(100, now - lastTime);
+          if (lastTime) elapsed += now - lastTime;
           lastTime = now;
-          const t = Math.min(1, elapsed / 2800);
+          const t = Math.min(1, elapsed / 1800);
           const P = from + (SERVICE_REST - from) * smootherstep(t);
           const top = section.getBoundingClientRect().top + window.scrollY;
           window.scrollTo({ top: top + P * (section.offsetHeight - window.innerHeight), behavior: "instant" });
@@ -343,8 +346,11 @@ export function Showroom() {
         }
         resolveScene(s);
         kick();
-        // Remaining services load only when selected, avoiding background shader
-        // compilation and model construction while the visitor is scrolling.
+        // Fetch the remaining small code bundles ahead of a click. Model builds
+        // and GPU compilation still happen only on intent, keeping scroll smooth.
+        preloadTimer = window.setTimeout(() => {
+          for (const { id } of H.services) void s.preload(id).catch(() => {});
+        }, 1000);
       } catch (err) {
         resolveScene(null);
         console.error("Hero scene failed, showing the poster instead", err);
@@ -363,6 +369,7 @@ export function Showroom() {
       fade?.cancel();
       release();
       cancelAnimationFrame(raf);
+      clearTimeout(preloadTimer);
       io.disconnect();
       ro.disconnect();
       window.removeEventListener("scroll", kick);

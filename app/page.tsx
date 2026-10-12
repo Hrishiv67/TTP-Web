@@ -12,7 +12,7 @@ import { TireHelp } from "@/components/TireHelp";
 import { TtpTire } from "@/components/TtpTire";
 import { Visit } from "@/components/Visit";
 import { Who } from "@/components/Who";
-import { HOURS, REVIEWS, SECOND_LOCATION, SHOP } from "@/lib/business";
+import { HOURS, REVIEWS, SHOP } from "@/lib/business";
 import { COPY, SERVICE_NAMES } from "@/lib/copy";
 import { SITE_URL } from "@/lib/site";
 
@@ -54,19 +54,6 @@ const structuredData = {
         itemOffered: { "@type": "Product", name: `${COPY.ttp.name} ${size}, 18 ply`, brand: { "@type": "Brand", name: COPY.ttp.name } },
       })),
     ],
-  },
-  department: {
-    "@type": "TireShop",
-    name: `${SHOP.name}, ${SECOND_LOCATION.label}`,
-    telephone: SECOND_LOCATION.phone.e164,
-    address: {
-      "@type": "PostalAddress",
-      streetAddress: SECOND_LOCATION.address.street,
-      addressLocality: SECOND_LOCATION.address.city,
-      addressRegion: SECOND_LOCATION.address.region,
-      postalCode: SECOND_LOCATION.address.postalCode,
-      addressCountry: "US",
-    },
   },
 };
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SECOND_LOCATION, SHOP } from "@/lib/business";
+import { SHOP } from "@/lib/business";
 import { COPY } from "@/lib/copy";
 import { telHref } from "@/lib/quote";
 import { CopyrightYear } from "./CopyrightYear";
@@ -29,19 +29,11 @@ export function SiteFooter() {
               <br />
               {SHOP.address.city}, {SHOP.address.region} {SHOP.address.postalCode}
             </address>
-            <address>
-              {SECOND_LOCATION.address.street}
-              <br />
-              {SECOND_LOCATION.address.city}, {SECOND_LOCATION.address.region} {SECOND_LOCATION.address.postalCode}
-            </address>
           </div>
           <div className="footer__col">
             <h2>{f.call}</h2>
             <p>
-              Dunn: <a href={telHref(SHOP.phone.e164)}>{SHOP.phone.display}</a>
-            </p>
-            <p>
-              {SECOND_LOCATION.label}: <a href={telHref(SECOND_LOCATION.phone.e164)}>{SECOND_LOCATION.phone.display}</a>
+              <a href={telHref(SHOP.phone.e164)}>{SHOP.phone.display}</a>
             </p>
             <h2 className="footer__sub">{f.hours}</h2>
             <p>{COPY.hours.open}</p>
@@ -63,6 +55,9 @@ export function SiteFooter() {
               </li>
               <li>
                 <Link href="/#quote">Get a quote by text</Link>
+              </li>
+              <li>
+                <Link href="/terms">Terms of Service</Link>
               </li>
             </ul>
           </nav>

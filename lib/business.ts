@@ -17,17 +17,6 @@ export const SHOP = {
   },
 } as const;
 
-export const SECOND_LOCATION = {
-  label: "Fayetteville",
-  phone: { display: "(910) 491-8142", e164: "+19104918142" },
-  address: {
-    street: "715-719 Mockernut Dr",
-    city: "Fayetteville",
-    region: "NC",
-    postalCode: "28312",
-  },
-} as const;
-
 type Address = { street: string; city: string; region: string; postalCode: string };
 
 export const oneLine = (a: Address) => `${a.street}, ${a.city}, ${a.region} ${a.postalCode}`;
@@ -44,7 +33,7 @@ export const REVIEWS = {
   rating: 4.8,
   count: 77,
   asOf: "October 2026",
-  url: `https://www.google.com/search?q=${encodeURIComponent(`${SHOP.name} ${oneLine(SHOP.address)} reviews`)}`,
+  url: "https://www.google.com/maps/place/Truck+Tire+Pro/@35.2688672,-78.6158895,1155m/data=!3m1!1e3!4m8!3m7!1s0x89ab83cbd219154d:0xed4025352682d073!8m2!3d35.2688672!4d-78.6158895!9m1!1b1!16s%2Fg%2F11vwndr3hj?hl=en-US&entry=ttu&g_ep=EgoyMDI2MTAwNy4wIKXMDSoASAFQAw%3D%3D",
 };
 
 /** Opening hours by JS weekday (0 = Sunday), as minutes after midnight, shop-local time. */

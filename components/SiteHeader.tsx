@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { SHOP, oneLine } from "@/lib/business";
 import { COPY } from "@/lib/copy";
 import { telHref } from "@/lib/quote";
-import { LiveStatus } from "./LiveStatus";
 import { PhoneIcon } from "./icons";
 
 /**
@@ -140,7 +139,6 @@ export function SiteHeader() {
           </ul>
         </nav>
         <div className="menu__foot">
-          <LiveStatus />
           <p>{oneLine(SHOP.address)}</p>
           <p>{COPY.hours.open}</p>
           <div className="menu__ctas">

@@ -9,7 +9,7 @@
  * often the same day). The TTP Tire facts and the promise come from the shop. Prices
  * aren't published: the shop prefers that customers call.
  */
-import { HOURS, REVIEWS, SECOND_LOCATION, SHOP } from "./business";
+import { HOURS, REVIEWS, SHOP } from "./business";
 import { weekHours } from "./hours";
 
 const PHONE = SHOP.phone.display;
@@ -43,7 +43,7 @@ export const COPY = {
   hero: {
     label: "Truck Tire Pro",
     headline: "Semi truck tires in Dunn, near I-95",
-    sub: "Steer, drive and trailer tires, with hundreds of sizes in stock at both locations. Call for pricing.",
+    sub: "Steer, drive and trailer tires, with hundreds of sizes in stock. Call for pricing.",
     hours: `Open ${WEEK.open}`,
     scroll: "Scroll to see what we do",
     bridge: "New tires, used tires and our own TTP Tire, plus the repairs that keep a truck on the road.",
@@ -133,7 +133,7 @@ export const COPY = {
 
   stock: {
     heading: "Hundreds of sizes in stock",
-    body: "We mostly sell semi truck tires: steer, drive and trailer. Both locations carry hundreds of sizes.",
+    body: "We mostly sell semi truck tires: steer, drive and trailer. Hundreds of sizes are stocked at our Dunn shop.",
     popularHeading: "Most popular",
     popular: ["295/75R22.5", "11R22.5", "11R24.5"],
     promise: "We promise quality and satisfaction with every tire.",
@@ -177,9 +177,7 @@ export const COPY = {
 
   location: {
     heading: "Hours and location",
-    dunnLabel: "Dunn, main shop",
-    fayettevilleLabel: SECOND_LOCATION.label,
-    fayettevilleNote: `Call ${SECOND_LOCATION.phone.display} to check this location's hours.`,
+    dunnLabel: "Dunn shop",
     directions: "Get directions",
     openMap: "Open in Google Maps",
     hoursHeading: "Hours",
@@ -324,12 +322,49 @@ export const COPY = {
   },
 
   footer: {
-    blurb: "We opened in 2020. The main shop is on Long Branch Road in Dunn.",
+    blurb: "We opened in 2020. Our shop is on Long Branch Road in Dunn.",
     visit: "Visit",
     call: "Call",
     hours: "Hours",
     links: "On this site",
     backToTop: "Back to top",
+  },
+
+  terms: {
+    title: `Terms of Service | ${SHOP.name}`,
+    description: `Terms for using the ${SHOP.name} website and requesting appointments and quotes at our Dunn, NC shop.`,
+    heading: "Terms of Service",
+    updated: "Last updated: October 12, 2026",
+    skip: "Skip to Terms of Service",
+    intro: `These terms cover your use of the ${SHOP.legalName} website, including appointment and quote requests. By using the website, you agree to these terms.`,
+    sections: [
+      {
+        heading: "Using the website",
+        body: "Use the website for legitimate service inquiries and provide accurate contact and vehicle details. Do not submit misleading requests or interfere with the site's operation.",
+      },
+      {
+        heading: "Appointment requests",
+        body: "Selecting a day and time does not confirm an appointment. We will contact you to confirm the request and availability. If you need urgent assistance, call the shop directly.",
+      },
+      {
+        heading: "Pricing and availability",
+        body: "Tires, parts and services are subject to availability. Call for current pricing and stock. We tell you the cost before work begins. Turnaround examples and estimates are not guarantees of completion time.",
+      },
+      {
+        heading: "Tires and repairs",
+        body: "Website descriptions and illustrations provide general information. A technician must inspect the tire or vehicle to determine suitable products and whether a repair can be performed safely. Ask the shop about any product warranty or service terms before approving work or purchasing a tire.",
+      },
+      {
+        heading: "Text messages and external links",
+        body: "When a button opens a draft in your messages app, you must send the message there for the shop to receive it. Your mobile carrier's messaging charges may apply. Links to Google Maps, reviews and other external services are subject to those services' own terms.",
+      },
+      {
+        heading: "Changes to these terms",
+        body: "We may update these terms when the website or services change. The date above identifies the latest version.",
+      },
+    ],
+    contactHeading: "Contact",
+    contactBody: "For questions about these terms, an appointment or a service, contact us at:",
   },
 
   notFound: {

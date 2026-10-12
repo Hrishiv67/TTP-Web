@@ -1,7 +1,8 @@
 # Truck Tire Pro: website
 
 Website for Truck Tire Pro Inc., a commercial truck tire shop at
-918 Long Branch Rd, Dunn, NC: the home page and an appointment page at `/book`.
+918 Long Branch Rd, Dunn, NC: the home page, an appointment page at `/book`, and
+Terms of Service at `/terms`.
 
 ## Running it
 
@@ -44,7 +45,7 @@ for a same-day slot. Requests are requests: the shop calls to confirm.
 | Services | 8 main services with a picture each; "See more" plays that service in the hero. Plus 4 smaller ones. |
 | Reviews | 4.8 from 77 reviews, as listed online in October 2026. |
 | Booking band | Book an Appointment. |
-| Hours and location | Map, hours table with today marked, live open/closed status (`lib/hours.ts`), and Fayetteville. |
+| Hours and location | Dunn shop address, map, and hours table with today marked. |
 | How a visit goes | Five steps and the one customer-reported turnaround figure. |
 | Not sure what tire you need? | Reading a tire size, tire positions, a button to text a photo of the sidewall. |
 | Who comes in | Owner-operators, fleets, vocational trucks, I-95 traffic. |
@@ -59,13 +60,11 @@ for a same-day slot. Requests are requests: the shop calls to confirm.
 - **`lib/copy.ts`** holds every sentence on the site.
 - **`lib/business.ts`** holds the facts: phone numbers, addresses, hours (minutes after
   midnight per weekday), the review figure and the booking settings. The copy, the
-  live status, the hours table, the booking page, the footer and the structured data
+  hours table, the booking page, the footer and the structured data
   all read from there.
 
 Things worth re-checking with the shop before launch:
 
-- The Fayetteville location and its number, (910) 491-8142, come from directory
-  listings, not from the shop.
 - Roadside tire service availability.
 - The review figure (4.8 from 77) goes stale as reviews come in; update `REVIEWS`
   or remove it.

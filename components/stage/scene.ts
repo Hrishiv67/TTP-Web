@@ -218,6 +218,10 @@ export async function createShowroom(
     },
     /** Build a service ahead of time (when its button is pointed at, say). */
     ensure,
+    /** Fetch its code without constructing models or compiling GPU shaders. */
+    preload(id: ServiceId) {
+      return SERVICES[id]();
+    },
     resize(w: number, h: number) {
       state.w = view.w = w;
       state.h = view.h = h;

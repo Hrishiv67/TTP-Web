@@ -1,7 +1,5 @@
-import { SHOP } from "@/lib/business";
 import { COPY } from "@/lib/copy";
-import { telHref } from "@/lib/quote";
-import { CalendarIcon, PhoneIcon } from "./icons";
+import { CalendarIcon } from "./icons";
 
 /** A black band between sections that asks for the booking. */
 export function BookBand() {
@@ -19,10 +17,6 @@ export function BookBand() {
           <a className="btn" href="/book">
             <CalendarIcon />
             <span>{COPY.cta.book}</span>
-          </a>
-          <a className="btn btn--line" href={telHref(SHOP.phone.e164)} aria-label={`${COPY.cta.quote}: call ${SHOP.phone.display}`}>
-            <PhoneIcon />
-            <span>{COPY.cta.quote}</span>
           </a>
         </div>
       </div>

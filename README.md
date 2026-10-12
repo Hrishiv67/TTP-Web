@@ -39,12 +39,11 @@ for a same-day slot. Requests are requests: the shop calls to confirm.
 
 | Section | Notes |
 | --- | --- |
-| Showroom (hero) | Three tires in a 3D studio (three.js) and a button for each main service: TTP Tire, new, used, flat repair, balancing. A tap moves the camera to that service and shows booking and quote buttons beside it. `components/Showroom.tsx`, `components/stage/`. |
-| TTP Tire | The shop's own brand: sizes, 18 ply, made in Malaysia. Prices aren't published; it says to call. |
-| Hundreds of sizes in stock | Steer, drive and trailer; the three most popular sizes; the shop's promise. |
-| Services | 8 main services with a render each, linking to `/book` with the service filled in, plus 4 smaller ones. |
+| Hero | The scroll-driven 3D sequence: intro, pick a service, that service's animation, then booking. See "The 3D hero" below. |
+| Tires we sell | The shop's own TTP Tire (sizes, 18 ply, made in Malaysia; prices aren't published, it says to call), then hundreds of sizes in stock, the three most popular, and the shop's promise. |
+| Services | 8 main services with a picture each; "See more" plays that service in the hero. Plus 4 smaller ones. |
 | Reviews | 4.8 from 77 reviews, as listed online in October 2026. |
-| Booking band | Book an Appointment and Get a Quote. |
+| Booking band | Book an Appointment. |
 | Hours and location | Map, hours table with today marked, live open/closed status (`lib/hours.ts`), and Fayetteville. |
 | How a visit goes | Five steps and the one customer-reported turnaround figure. |
 | Not sure what tire you need? | Reading a tire size, tire positions, a button to text a photo of the sidewall. |
@@ -52,8 +51,8 @@ for a same-day slot. Requests are requests: the shop calls to confirm.
 | Get a quote by text | Builds a text message to (910) 230-0433 in the visitor's own messages app (`lib/quote.ts`). No server, nothing stored. |
 | Phone action bar | Get a Quote (calls the shop), Book, Directions; fixed to the bottom on phones. |
 
-"Get a Quote" buttons everywhere call (910) 230-0433. "Book an Appointment" buttons
-go to `/book`.
+"Get a Quote" (in the header, the hero, the footer and the phone bar) calls
+(910) 230-0433. "Book an Appointment" buttons go to `/book`.
 
 ## Changing the words
 
@@ -73,29 +72,38 @@ Things worth re-checking with the shop before launch:
 - The TTP Tire in the 3D scene has a rib tread. If the real tire's tread looks
   different, the model can be changed to match a photo.
 
-## The 3D showroom
+## The 3D hero
 
-Everything in it is generated in the browser from code; there are no model
-files or videos to download.
+A scroll-driven sequence in a black studio. The section pins to the screen and the
+scroll plays it, in three parts (`components/stage/sequence.ts`):
 
+1. **Intro**: the three tires (a new TTP Tire, a used tire, a trailer tire) come up out
+   of the dark while the camera swings round.
+2. **Pick**: a hold on the lineup with a button for each service.
+3. **Service**: the chosen service's own animation (TTP Tire if nobody picks), then a
+   panel with Book an Appointment and "See another service". Each service card further
+   down has "See more", which plays that service here.
+
+Everything is generated in the browser from code; there are no model files or videos.
+
+- `components/Showroom.tsx` pins the section, feeds the scene the scroll position, and
+  fades the text in and out.
+- `components/stage/scene.ts` is the scene: the lineup, the move from the lineup into a
+  service, and loading each service when it's needed.
+- `components/stage/services/` has one file per service. Each one builds its props and
+  describes its camera moves and animation as a function of how far the scroll has got
+  (`services/types.ts` explains the contract; `repair.ts` is a readable example).
 - `components/stage/tireModel.ts` builds a 295/75R22.5 tire on a 10-hole aluminum
-  wheel: the tread patterns (zig-zag rib steer, open-shoulder lug drive, straight rib
-  trailer) are modelled flat and wrapped onto the crown, and the sidewall lettering
-  is a bump map drawn on a canvas. Options add the TTP TIRE lettering, wear and
-  crayon marks, a repair plug, and balance weights.
-- `components/stage/stageStates.ts` is the shot list: for each stop, the camera,
-  lens and framing, and each tire's turn, roll and light. Phones get their own
-  framing for the opening shot.
-- `components/stage/tireScene.ts` is the studio (lights, floor, camera) and moves
-  between stops. Each frame is composed exactly like the matching poster image and
-  scaled the way CSS `object-fit: cover` scales it, so the swap from the poster to the
-  live scene doesn't jump.
+  wheel, with the shop's TTP TIRE lettering, wear, and helpers for marks on the tread
+  and sidewall. `studio.ts` is the lights, floor and contact shadows; `shots.ts` is the
+  camera maths, including composing each frame exactly like the poster images so the
+  swap from poster to live scene doesn't jump.
 
-With reduced motion turned on, without WebGL, or before the 3D has loaded, still
-renders in `public/stage/` stand in (`hero-<stop>-<wide|mid|tall>.webp`). If you change
-the scene, re-render them from the dev server (in development the page exposes the
-scene as `window.__stage` and the shots as `window.__stops`) and replace those files.
-The service pictures in `public/services/` were rendered in the same studio.
+With reduced motion turned on, without WebGL, or before JavaScript runs, the hero is one
+screen over the poster (`public/stage/hero-intro-<wide|mid|tall>.webp`) and the picker
+links to the service cards. If you change the scene, re-render the posters and the card
+pictures in `public/services/` from the dev server (in development the page exposes the
+scene as `window.__stage` and the timeline as `window.__seq`).
 
 ## Design
 

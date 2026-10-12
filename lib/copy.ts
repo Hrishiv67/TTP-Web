@@ -37,6 +37,7 @@ export const COPY = {
     bookShort: "Book",
     quote: "Get a Quote",
     bookTime: "Book a time",
+    seeMore: "See more",
   },
 
   hero: {
@@ -44,24 +45,70 @@ export const COPY = {
     headline: "Semi truck tires in Dunn, near I-95",
     sub: "Steer, drive and trailer tires, with hundreds of sizes in stock at both locations. Call for pricing.",
     hours: `Open ${WEEK.open}`,
-    pick: "See what we do",
-    back: "Back to all tires",
-    // the stops in the 3D showroom; ids match the scene's shots
-    stops: [
-      { id: "ttp", label: "TTP Tire", line: "Our own brand of tire. It's 18 ply, made in Malaysia, and gives a smoother ride." },
-      { id: "new", label: "New tires", line: "Top truck tire brands at competitive prices, for semis, box trucks, pickups and trailers." },
-      { id: "used", label: "Used tires", line: "Every one is inspected before it goes on the rack, and they start at a fraction of the price of new." },
-      { id: "repair", label: "Flat repair", line: "Punctures and slow leaks, often fixed the same day." },
-      { id: "balance", label: "Balancing", line: "A balanced wheel stops the vibration and helps the tire last longer." },
+    scroll: "Scroll to see what we do",
+    bridge: "New tires, used tires and our own TTP Tire, plus the repairs that keep a truck on the road.",
+    pickHeading: "What does your truck need?",
+    pickSub: "Pick one, then keep scrolling to see how we do it.",
+    another: "See another service",
+    // the services in the 3D sequence; ids match components/stage/sequence.ts, and `book`
+    // is the name the booking form preselects
+    services: [
+      {
+        id: "ttp", chip: "TTP Tire", book: "TTP Tire",
+        name: "TTP Tire",
+        line: "Our own brand of tire, made in Malaysia.",
+        detail: "18 ply, with a smoother ride. Built for long haul and short haul, dump trucks and over-the-road trucks.",
+      },
+      {
+        id: "new", chip: "New tires", book: "New tires",
+        name: "New tires",
+        line: "Top truck tire brands at competitive prices.",
+        detail: "Fresh off the truck, label still on the tread. Sizes for semis, box trucks, pickups and trailers.",
+      },
+      {
+        id: "used", chip: "Used tires", book: "Used tires",
+        name: "Used tires",
+        line: "Start at a fraction of the price of new.",
+        detail: "Every one is checked before it goes on the rack. We measure the tread and mark it on the sidewall.",
+      },
+      {
+        id: "repair", chip: "Flat repair", book: "Tire repair",
+        name: "Flat repair",
+        line: "Punctures and slow leaks, often fixed the same day.",
+        detail: "We pull out what went in, plug the hole and trim it flush, then circle the repair so you know it was done.",
+      },
+      {
+        id: "balance", chip: "Balancing", book: "Wheel balancing",
+        name: "Wheel balancing",
+        line: "Stops the shake you feel at speed.",
+        detail: "We spin the wheel, find the heavy spot and clip on weights until it runs true. Balanced tires last longer.",
+      },
+      {
+        id: "alignment", chip: "Alignment", book: "Alignment",
+        name: "Alignment",
+        line: "So the truck tracks straight.",
+        detail: "Tires that point the right way wear evenly and save fuel.",
+      },
+      {
+        id: "ac", chip: "A/C work", book: "A/C work",
+        name: "A/C work",
+        line: "Semi truck A/C, diagnosed and repaired.",
+        detail: "We recharge the system and put in new compressors, so you stay cool on the road.",
+      },
+      {
+        id: "washout", chip: "Trailer washouts", book: "Trailer washouts",
+        name: "Trailer washouts",
+        line: "Debris, residue and buildup, washed out between loads.",
+        detail: "Quick turnaround, so you stay on schedule.",
+      },
+      {
+        id: "maintenance", chip: "Maintenance", book: "General maintenance",
+        name: "General maintenance",
+        line: "Rotations, pressure checks and tread inspections.",
+        detail: "For one truck or a whole fleet.",
+      },
     ],
-    stillAlt: {
-      all: "A new TTP Tire, a used tire and a repaired tire standing side by side",
-      ttp: "A TTP Tire, the shop's own brand, with TTP TIRE and 18 PLY RATING on the sidewall",
-      new: "A new truck tire on an aluminum wheel",
-      used: "A used truck tire with its tread depth marked in crayon",
-      repair: "A plug sealing a puncture in a truck tire's tread",
-      balance: "Balance weights on the rim of a truck wheel",
-    },
+    posterAlt: "A new TTP Tire, a used tire and a trailer tire standing in a dark studio",
   },
 
   ttp: {
@@ -74,16 +121,17 @@ export const COPY = {
       ["Ply rating", "18 ply"],
       ["Made in", "Malaysia"],
     ],
-    price: "Call for pricing",
+    pricePrefix: "Call",
+    priceSuffix: "for pricing.",
+    watch: "See it in 3D",
     alt: "A TTP Tire on an aluminum wheel, with TTP TIRE and 18 PLY RATING on the sidewall",
   },
 
-  sizes: {
+  stock: {
     heading: "Hundreds of sizes in stock",
     body: "We mostly sell semi truck tires: steer, drive and trailer. Both locations carry hundreds of sizes.",
-    popularHeading: "Our most popular sizes",
+    popularHeading: "Most popular",
     popular: ["295/75R22.5", "11R22.5", "11R24.5"],
-    price: `Call ${PHONE} for pricing on any size.`,
     promise: "We promise quality and satisfaction with every tire.",
   },
 

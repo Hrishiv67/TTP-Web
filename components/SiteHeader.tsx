@@ -95,8 +95,6 @@ export function SiteHeader() {
             ))}
           </nav>
 
-          <LiveStatus compact className="masthead__status" />
-
           <div className="masthead__ctas">
             <a className="btn btn--sm btn--line masthead__quote" href={telHref(SHOP.phone.e164)} aria-label={`${COPY.cta.quote}: call ${SHOP.phone.display}`}>
               <PhoneIcon size={16} />

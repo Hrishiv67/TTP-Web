@@ -15,7 +15,7 @@ export const DIM = {
 };
 
 // new tread depth by position, meters
-const DEPTH: Record<TireKind, number> = { steer: 0.014, drive: 0.022, trailer: 0.01 };
+export const DEPTH: Record<TireKind, number> = { steer: 0.014, drive: 0.022, trailer: 0.01 };
 
 type Soup = number[];
 type Poly = [number, number][];
@@ -31,7 +31,7 @@ function crown(v: number, R0: number, out = crownOut) {
   const s = v < 0 ? -1 : 1;
   if (av <= A) {
     const t = av / A;
-    out.r = R0 + 0.004 * (1 - t * t);
+    out.r = R0 + CROWN * (1 - t * t);
     out.y = v;
     out.nr = 1;
     out.ny = 0;
@@ -583,7 +583,7 @@ export function makeMaterials() {
     groove: new THREE.MeshStandardMaterial({ ...rubber, color: 0x0c0c0c, roughness: 0.9 }),
     treadRubber: new THREE.MeshStandardMaterial({ ...rubber, color: 0x0e0e0e, vertexColors: true, roughness: 0.92, bumpMap: grain, bumpScale: 0.12 }),
     sidewall: (bump: THREE.Texture, map?: THREE.Texture) =>
-      new THREE.MeshStandardMaterial({ ...rubber, color: map ? 0xffffff : 0x121212, map, roughness: 0.62, bumpMap: bump, bumpScale: 6 }),
+      new THREE.MeshStandardMaterial({ ...rubber, color: map ? 0xffffff : 0x121212, ...(map ? { map } : {}), roughness: 0.62, bumpMap: bump, bumpScale: 6 }),
     // worn tread: drier, scuffed rubber
     wornTread: new THREE.MeshStandardMaterial({ ...rubber, color: 0x171615, vertexColors: true, roughness: 0.97, bumpMap: grain, bumpScale: 0.2 }),
     plug: new THREE.MeshStandardMaterial({ color: 0x2b2018, roughness: 0.85, envMapIntensity: 0.3 }),
@@ -601,14 +601,99 @@ export function makeMaterials() {
 export type TireOptions = {
   font: string;
   maxTexture: number;
-  worn?: boolean; // a used tire: shallower tread, scuffed rubber, crayon marks
+  worn?: boolean; // a used tire: shallower tread, scuffed rubber
+  crayon?: boolean; // on a worn tire, the tech's crayon marks on the sidewall (default true)
   plug?: boolean; // a repaired puncture
   weights?: boolean; // balance weights on the rim
   brand?: boolean; // the shop's own TTP Tire lettering on the sidewall
 };
 
-/** Tread lost on a worn tire, as a fraction of new depth. */
-const WORN = 0.55;
+/** Tread left on a worn tire, as a fraction of new depth. */
+export const WORN = 0.55;
+
+/** The crown is slightly fuller in the middle: how much, at an axial position y. */
+const CROWN = 0.004;
+const bulge = (y: number) => (Math.abs(y) <= DIM.A ? CROWN * (1 - (y / DIM.A) ** 2) : 0);
+
+/** Radius of the tops of the tread blocks at an axial position y across the tread (0 is the middle). */
+export const treadRadius = (kind: TireKind, worn = false, y = 0) => DIM.RO - DEPTH[kind] * (worn ? 1 - WORN : 0) + bulge(y);
+
+/** The outboard sidewall's profile, bead to shoulder, as (radius, axial y) points. */
+export const outerSidewall = (kind: TireKind) => sidewallCurve(DIM.RO - DEPTH[kind], 1).reverse();
+
+/** Outboard sidewall height (axial y) at a radius, by the profile. */
+export function sidewallY(kind: TireKind, r: number) {
+  const pts = outerSidewall(kind);
+  for (let j = 1; j < pts.length; j++) {
+    const a = pts[j - 1], b = pts[j];
+    if ((r - a.x) * (r - b.x) <= 0) return a.y + ((r - a.x) / (b.x - a.x || 1)) * (b.y - a.y);
+  }
+  return pts[r < pts[0].x ? 0 : pts.length - 1].y;
+}
+
+/**
+ * A thin strip lying on the outboard sidewall between two radii and over an arc, for
+ * marks drawn on the rubber (crayon, chalk, labels). Angles follow the model: a point at
+ * theta is (r sin theta, y, r cos theta) in the tire's frame, so with the tire standing
+ * and unrolled, theta = PI is the top and theta grows counter-clockwise as seen from
+ * outside. u runs along the arc and v from r0 to r1; at the top of the tire that reads
+ * right to left, so pass flipU to have u read left to right there.
+ */
+export function sidewallDecal(
+  kind: TireKind, r0: number, r1: number, theta0: number, thetaLen: number, material: THREE.Material,
+  { lift = 0.0012, segs = 64, rings = 12, flipU = false } = {},
+) {
+  const pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  for (let i = 0; i <= segs; i++) {
+    const th = theta0 + (i / segs) * thetaLen;
+    for (let j = 0; j <= rings; j++) {
+      const r = r0 + (j / rings) * (r1 - r0);
+      pos.push(r * Math.sin(th), sidewallY(kind, r) + lift, r * Math.cos(th));
+      uv.push(flipU ? 1 - i / segs : i / segs, j / rings);
+    }
+  }
+  for (let i = 0; i < segs; i++) for (let j = 0; j < rings; j++) {
+    const a = i * (rings + 1) + j, b = a + rings + 1;
+    idx.push(a, a + 1, b, a + 1, b + 1, b); // facing outboard
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return new THREE.Mesh(g, material);
+}
+
+/**
+ * A thin band wrapped round the tops of the tread blocks over an arc, between two axial
+ * positions y0 and y1 (the flat of the crown is about -0.1 to 0.1), for things stuck on
+ * the tread like a paper label. u runs along the arc (with theta), v from y0 to y1.
+ */
+export function treadDecal(
+  kind: TireKind, worn: boolean, theta0: number, thetaLen: number, y0: number, y1: number, material: THREE.Material,
+  { lift = 0.0015, segs = 48, rows = 4 } = {},
+) {
+  const pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  for (let i = 0; i <= segs; i++) {
+    const th = theta0 + (i / segs) * thetaLen;
+    for (let j = 0; j <= rows; j++) {
+      const y = y0 + (j / rows) * (y1 - y0);
+      const R = treadRadius(kind, worn, y) + lift;
+      pos.push(R * Math.sin(th), y, R * Math.cos(th));
+      uv.push(i / segs, j / rows);
+    }
+  }
+  for (let i = 0; i < segs; i++) for (let j = 0; j < rows; j++) {
+    const a = i * (rows + 1) + j, b = a + rows + 1;
+    idx.push(a, b, a + 1, a + 1, b, b + 1); // facing outward
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return new THREE.Mesh(g, material);
+}
 
 export function makeTire(kind: TireKind, materials: TireMaterials, opts: TireOptions) {
   const group = new THREE.Group();
@@ -616,7 +701,7 @@ export function makeTire(kind: TireKind, materials: TireMaterials, opts: TireOpt
   const body = carcass(kind);
   const w = wheelGeometry();
   const bump = sidewallTexture(body.outPts, body.outerLength, kind, opts.font, opts.maxTexture, opts.brand);
-  const side = opts.worn
+  const side = opts.worn && opts.crayon !== false
     ? materials.sidewall(bump, sidewallCrayon(body.outPts, body.outerLength, opts.font, opts.maxTexture))
     : materials.sidewall(bump);
   const wear = opts.worn ? WORN : 1;

@@ -8,7 +8,6 @@ import { Services } from "@/components/Services";
 import { Showroom } from "@/components/Showroom";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
-import { Sizes } from "@/components/Sizes";
 import { TireHelp } from "@/components/TireHelp";
 import { TtpTire } from "@/components/TtpTire";
 import { Visit } from "@/components/Visit";
@@ -81,7 +80,6 @@ export default function Home() {
       <main id="main">
         <Showroom />
         <TtpTire />
-        <Sizes />
         <Services />
         <Reviews />
         <BookBand />

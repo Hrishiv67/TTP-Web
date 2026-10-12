@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { BOOKING, HOURS, SHOP, TIME_ZONE } from "@/lib/business";
 import { bookingSummary, openDays, slotsFor, validPhone, type BookingRequest } from "@/lib/booking";
+import { DAY_NAMES, formatRange } from "@/lib/hours";
 import { ALL_SERVICES, COPY } from "@/lib/copy";
 import { smsHref, telHref } from "@/lib/quote";
 import { useNow } from "@/lib/useNow";
@@ -218,6 +219,11 @@ export function BookingForm() {
             ))}
           </div>
         )}
+        {day ? (
+          <p className="field__hint">
+            {DAY_NAMES[day.weekday]} hours: {formatRange(HOURS[day.weekday])}
+          </p>
+        ) : null}
         {err("time")}
       </fieldset>
 

@@ -49,3 +49,21 @@ test("summarizes a request and checks phone numbers", () => {
   assert.ok(validPhone("+1 910 555 0100"));
   assert.ok(!validPhone("555-0100"));
 });
+
+test("follows each day's own hours", () => {
+  // a shorter Saturday: slots stop half an hour before its 1 PM close, and today drops off sooner
+  const short = { ...HOURS, 6: { open: 8 * 60, close: 13 * 60 } };
+  const now = new Date("2026-10-17T13:00:00Z"); // Sat 09:00
+  const [sat] = openDays(now, short, TIME_ZONE, BOOKING);
+  const s = slotsFor(sat, now, short, TIME_ZONE, BOOKING);
+  assert.equal(s[0].label, "10 AM");
+  assert.equal(s[s.length - 1].label, "12:30 PM");
+  const late = openDays(new Date("2026-10-17T15:45:00Z"), short, TIME_ZONE, BOOKING); // Sat 11:45
+  assert.equal(late[0].iso, "2026-10-19");
+});
+
+test("on a Sunday, the first choice is Monday, tomorrow", () => {
+  const d = days("2026-10-18T16:00:00Z"); // Sun 12:00
+  assert.equal(d[0].iso, "2026-10-19");
+  assert.match(d[0].label, /^Tomorrow, Oct 19/);
+});

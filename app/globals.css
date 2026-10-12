@@ -370,13 +370,6 @@ button {
   background-size: 100% 2px;
 }
 
-/* wide enough for the longest status, so nothing shifts when the clock takes over */
-.masthead__status {
-  min-width: 14.25rem;
-  padding-left: 30px;
-  border-left: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-}
-
 .masthead__ctas {
   display: flex;
   gap: 10px;
@@ -415,12 +408,6 @@ button {
   content: "";
   position: relative;
   top: 6px;
-}
-
-@media (max-width: 1439px) {
-  .masthead__status {
-    display: none;
-  }
 }
 
 @media (max-width: 1080px) {
@@ -533,22 +520,28 @@ button {
   margin-top: 18px;
 }
 
-/* ------------------------------------------------------------------ showroom (hero)
-   One screen: three tires in the black studio, the intro on top and a button
-   for each service along the bottom. A tapped service swaps the intro for that
-   service's panel while the camera moves; the text lands as the shot settles. */
+/* ------------------------------------------------------------------ hero (scroll sequence)
+   Base layout, used with reduced motion, without WebGL and before JavaScript: one
+   screen over the poster, then the service picker linking to the cards below. With
+   motion allowed the section grows to the length of the scroll, the screen pins, and
+   the blocks of text stack on top of the 3D scene, fading in and out as it plays. */
 .show {
   position: relative;
-  height: 100svh;
-  min-height: 600px;
-  overflow: hidden;
   background: var(--black);
   color: var(--white);
 }
 
-.show__media,
+.show__pin {
+  position: relative;
+}
+
+.show__media {
+  position: absolute;
+  inset: 0 0 auto;
+  height: max(560px, 100svh);
+}
+
 .show__media picture,
-.show__still,
 .show__canvas {
   position: absolute;
   inset: 0;
@@ -558,15 +551,6 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.show__still {
-  opacity: 0;
-  transition: opacity 0.6s var(--ease);
-}
-
-.show__still[data-active] {
-  opacity: 1;
 }
 
 .show__canvas {
@@ -580,31 +564,75 @@ button {
   opacity: 1;
 }
 
-.show__ui {
+.beat {
   position: relative;
-  height: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.beat--intro {
+  min-height: max(560px, 100svh);
+}
+
+.beat--mid,
+.beat--side {
+  display: none;
+}
+
+.beat--pick {
+  padding-block: clamp(56px, 8vw, 104px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .show:not([data-mode="static"]) {
+    height: calc(var(--screens) * 100svh);
+  }
+
+  .show:not([data-mode="static"]) .show__pin {
+    position: sticky;
+    top: 0;
+    height: 100svh;
+    min-height: 560px;
+    overflow: hidden;
+  }
+
+  .show:not([data-mode="static"]) .show__media {
+    inset: 0;
+    height: auto;
+  }
+
+  .show:not([data-mode="static"]) .beat {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    min-height: 0;
+    padding: 0;
+    opacity: 0;
+    pointer-events: none;
+    will-change: opacity, transform;
+  }
+
+  .show:not([data-mode="static"]) .beat--intro {
+    opacity: 1;
+  }
+
+  .show:not([data-mode="static"]) .beat:not([data-hidden="true"]) :is(a, button) {
+    pointer-events: auto;
+  }
+}
+
+.beat > .wrap {
+  position: relative;
+  width: min(100% - 2 * var(--gutter), 1320px);
+}
+
+.beat--top > .wrap {
   padding-top: calc(var(--masthead) + clamp(20px, 6vh, 72px));
-  padding-bottom: clamp(20px, 4.5vh, 44px);
 }
 
-.show__intro,
-.show__panel {
-  grid-area: 1 / 1;
-  transition: opacity 0.35s var(--ease), transform 0.35s var(--ease), visibility 0s linear 0.35s;
-}
-
-.show__intro {
-  align-self: start;
-}
-
-.show__intro .t-hero {
+/* intro: the headline, then the lede beside the buttons on wide screens */
+.beat--intro .t-hero {
   max-width: 12.5em;
 }
 
-/* the lede and the buttons share a row under the headline on wide screens */
 .show__row {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -626,7 +654,8 @@ button {
 .show__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  align-items: center;
+  gap: 12px 24px;
 }
 
 .show__hours {
@@ -635,78 +664,88 @@ button {
   font-weight: 500;
 }
 
-.show__panel {
-  align-self: center;
-  justify-items: start;
-  display: grid;
-  gap: clamp(14px, 2.2vh, 24px);
-  max-width: min(31rem, 40%);
+.show__scroll {
+  display: none;
 }
 
-.show__name {
+.show:not([data-mode="static"]) .show__scroll {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: clamp(20px, 4vh, 40px);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* a short line that runs down, over and over: keep scrolling */
+.show__scroll::after {
+  content: "";
+  width: 2px;
+  height: 32px;
+  background: linear-gradient(var(--white), var(--white)) top / 100% 0 no-repeat, rgba(255, 255, 255, 0.25);
+  animation: scrollcue 1.8s var(--ease) infinite;
+}
+
+@keyframes scrollcue {
+  0% {
+    background-size: 100% 0, auto;
+    background-position: top;
+  }
+  50% {
+    background-size: 100% 100%, auto;
+    background-position: top;
+  }
+  51% {
+    background-position: bottom;
+  }
+  100% {
+    background-size: 100% 0, auto;
+    background-position: bottom;
+  }
+}
+
+/* the line between the intro and the picker, up top while the camera swings round */
+.show__bridge {
   font-family: var(--font-display);
   font-weight: var(--display-weight);
-  letter-spacing: var(--display-track);
-  font-size: clamp(3rem, 1rem + 5vw, 6.75rem);
-  line-height: 0.95;
+  letter-spacing: calc(var(--display-track) * 0.6);
+  font-size: clamp(1.75rem, 1rem + 2.4vw, 3.25rem);
+  line-height: 1.08;
+  text-wrap: balance;
 }
 
-.show__back {
-  margin-top: 2px;
+.show__bridge {
+  max-width: 40rem;
 }
 
-.show[data-stop]:not([data-stop="all"]) .show__intro,
-.show__panel:not([data-active]) {
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-14px);
+/* the picker: above the lineup, which sits low in the frame */
+.show__pickHeading {
+  font-size: clamp(2.25rem, 1rem + 3.4vw, 4.25rem);
 }
 
-.show__panel:not([data-active]) {
-  transform: translateY(18px);
-}
-
-/* on the way in, wait for the camera; the stills swap faster */
-.show__panel[data-active],
-.show[data-stop="all"] .show__intro {
-  transition-delay: 0.6s, 0.6s, 0s;
-}
-
-.show[data-mode="static"] .show__panel[data-active],
-.show[data-mode="static"][data-stop="all"] .show__intro {
-  transition-delay: 0.2s, 0.2s, 0s;
-}
-
-.show__dock {
-  grid-row: 2;
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 20px;
-  padding-top: 20px;
-}
-
-.show__pick {
-  font-size: 0.9375rem;
-  font-weight: 600;
+.beat--pick .t-lede {
+  margin-top: clamp(10px, 1.6vh, 16px);
 }
 
 .show__chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  max-width: 52rem;
+  margin-top: clamp(18px, 3vh, 32px);
 }
 
 .show__chip {
   display: inline-flex;
   align-items: center;
   min-height: 46px;
-  padding: 0 20px;
-  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  padding: 0 18px;
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
   border-radius: var(--radius);
-  background: rgba(0, 0, 0, 0.4);
-  color: var(--white);
+  background: rgba(0, 0, 0, 0.45);
   font-size: 1rem;
   font-weight: 600;
   white-space: nowrap;
@@ -717,7 +756,7 @@ button {
   border-color: var(--white);
 }
 
-.show__chip[aria-pressed="true"] {
+.show__chip[aria-current="true"] {
   border-color: var(--white);
   background: var(--white);
   color: var(--ink);
@@ -725,6 +764,37 @@ button {
 
 .show__chip:focus-visible {
   outline-color: var(--white);
+}
+
+/* a service: its name and words beside the subject (under it on tall screens) */
+.beat--side > .wrap {
+  display: flex;
+  align-items: center;
+}
+
+.show__panel {
+  display: grid;
+  justify-items: start;
+  gap: clamp(14px, 2.2vh, 24px);
+  max-width: min(30rem, 38%);
+}
+
+.show__name {
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-track);
+  font-size: clamp(2.75rem, 1rem + 4.6vw, 6.25rem);
+  line-height: 0.95;
+  text-wrap: balance;
+}
+
+.show__detail {
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  letter-spacing: calc(var(--display-track) * 0.5);
+  font-size: clamp(1.5rem, 1rem + 1.5vw, 2.5rem);
+  line-height: 1.12;
+  text-wrap: balance;
 }
 
 @media (max-width: 1080px) {
@@ -739,10 +809,14 @@ button {
   }
 }
 
-/* tall screens: the tires sit in the middle and the text goes under them */
+/* tall screens: the subject sits high and the words go underneath */
 @media (max-aspect-ratio: 6 / 5) {
+  .beat--side > .wrap {
+    align-items: flex-end;
+    padding-bottom: clamp(32px, 6vh, 64px);
+  }
+
   .show__panel {
-    align-self: end;
     max-width: 36rem;
   }
 
@@ -750,25 +824,20 @@ button {
     font-size: clamp(2.5rem, 1rem + 7vw, 4.75rem);
   }
 
-  .show__media::after {
+  .show:not([data-mode="static"]) .show__media::after {
     content: "";
     position: absolute;
-    inset: 55% 0 0;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
+    inset: 52% 0 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0));
   }
 }
 
 @media (max-width: 760px) {
-  .show {
-    min-height: 560px;
-  }
-
-  .show__ui {
+  .beat--top > .wrap {
     padding-top: calc(var(--masthead) + clamp(12px, 3vh, 28px));
-    padding-bottom: calc(58px + env(safe-area-inset-bottom) + 14px);
   }
 
-  .show__intro .t-lede {
+  .beat--intro .t-lede {
     font-size: 1.0625rem;
   }
 
@@ -778,35 +847,21 @@ button {
     font-size: 1rem;
   }
 
-  .show__dock {
-    gap: 8px;
-    padding-top: 14px;
+  .show:not([data-mode="static"]) .show__scroll {
+    bottom: calc(58px + env(safe-area-inset-bottom) + 16px);
   }
 
-  .show__pick {
-    font-size: 0.875rem;
+  .beat--side > .wrap {
+    padding-bottom: calc(58px + env(safe-area-inset-bottom) + 24px);
   }
 
-  /* one row of buttons that scrolls sideways */
   .show__chips {
-    flex-wrap: nowrap;
-    width: calc(100% + 2 * var(--gutter));
-    margin-inline: calc(-1 * var(--gutter));
-    padding-inline: var(--gutter);
-    overflow-x: auto;
-    scrollbar-width: none;
-    /* the last button fades at the edge, a hint that the row scrolls */
-    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--gutter) - 16px), transparent);
-    mask-image: linear-gradient(to right, #000 calc(100% - var(--gutter) - 16px), transparent);
-  }
-
-  .show__chips::-webkit-scrollbar {
-    display: none;
+    gap: 6px;
   }
 
   .show__chip {
-    min-height: 44px;
-    padding: 0 16px;
+    min-height: 42px;
+    padding: 0 14px;
     font-size: 0.9375rem;
   }
 }
@@ -908,8 +963,8 @@ button {
   }
 }
 
-/* TTP Tire: the shop's own brand, a render beside the facts */
-.ttp__grid {
+/* the tires we sell: TTP Tire beside its facts, then what's in stock */
+.tires__grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   column-gap: 24px;
@@ -917,7 +972,7 @@ button {
   align-items: center;
 }
 
-.ttp__media {
+.tires__media {
   grid-column: 1 / span 6;
   aspect-ratio: 1;
   overflow: hidden;
@@ -925,20 +980,20 @@ button {
   background: var(--black);
 }
 
-.ttp__media img {
+.tires__media img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.ttp__body {
+.tires__body {
   grid-column: 8 / span 5;
   display: grid;
   justify-items: start;
   gap: 22px;
 }
 
-.ttp__kicker {
+.tires__kicker {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -946,19 +1001,19 @@ button {
   font-weight: 700;
 }
 
-.ttp__kicker::before {
+.tires__kicker::before {
   content: "";
   width: 28px;
   height: 3px;
   background: var(--brand-red);
 }
 
-.ttp__facts {
+.tires__facts {
   width: 100%;
   border-top: 3px solid var(--rule-strong);
 }
 
-.ttp__facts div {
+.tires__facts div {
   display: grid;
   grid-template-columns: 9rem 1fr;
   gap: 16px;
@@ -966,50 +1021,40 @@ button {
   border-bottom: 1px solid var(--rule);
 }
 
-.ttp__facts dt {
+.tires__facts dt {
   font-weight: 700;
 }
 
-.ttp__price {
-  font-family: var(--font-display);
-  font-weight: var(--display-weight);
-  letter-spacing: calc(var(--display-track) * 0.4);
-  font-size: clamp(1.5rem, 1.1rem + 1.1vw, 2.125rem);
-  line-height: 1.1;
+.tires__price a {
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--brand-red);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
 }
 
-.ttp__actions {
+.tires__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  align-items: center;
+  gap: 12px 28px;
 }
 
-@media (max-width: 900px) {
-  .ttp__media,
-  .ttp__body {
-    grid-column: 1 / -1;
-  }
-}
-
-@media (max-width: 560px) {
-  .ttp__media {
-    aspect-ratio: 4 / 3;
-  }
-
-  .ttp__facts div {
-    grid-template-columns: 7rem 1fr;
-  }
-}
-
-/* in stock: the popular sizes set big, each underlined like the size code */
-.stock__row {
+.stock {
   display: grid;
-  gap: 20px;
-  padding-top: 20px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px 24px;
+  margin-top: clamp(56px, 7vw, 104px);
+  padding-top: clamp(28px, 3.5vw, 44px);
   border-top: 3px solid var(--rule-strong);
 }
 
+.stock .t-h3 {
+  margin-bottom: 10px;
+}
+
 .stock__label {
+  margin-bottom: 12px;
   font-size: 1.0625rem;
   font-weight: 700;
 }
@@ -1017,62 +1062,55 @@ button {
 .stock__sizes {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 16px 40px;
+  gap: 8px;
 }
 
 .stock__sizes li {
-  padding-bottom: 0.08em;
-  background: linear-gradient(var(--brand-red), var(--brand-red)) left bottom / 100% 0.06em no-repeat;
+  padding: 8px 14px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius);
+  font-weight: 700;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.stock__promise {
   font-family: var(--font-display);
   font-weight: var(--display-weight);
-  font-size: clamp(2.25rem, 1rem + 3.4vw, 4.5rem);
-  font-variant-numeric: lining-nums tabular-nums;
-  letter-spacing: -0.02em;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.stock__foot {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  column-gap: 24px;
-  row-gap: 24px;
-  align-items: end;
-  margin-top: clamp(48px, 6vw, 88px);
-  padding-top: clamp(24px, 3vw, 36px);
-  border-top: 1px solid var(--rule);
-}
-
-.stock__foot .t-h3 {
-  grid-column: 1 / span 7;
-}
-
-.stock__call {
-  grid-column: 8 / -1;
-  display: grid;
-  justify-items: start;
-  gap: 14px;
-}
-
-@media (max-width: 1080px) {
-  .stock__sizes {
-    justify-content: flex-start;
-  }
+  letter-spacing: calc(var(--display-track) * 0.4);
+  font-size: clamp(1.375rem, 1.1rem + 0.7vw, 1.875rem);
+  line-height: 1.15;
 }
 
 @media (max-width: 900px) {
-  .stock__foot .t-h3,
-  .stock__call {
+  .tires__media,
+  .tires__body {
     grid-column: 1 / -1;
+  }
+
+  .stock {
+    grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 760px) {
-  .stock__sizes {
-    flex-direction: column;
-    align-items: flex-start;
+@media (max-width: 560px) {
+  .tires__media {
+    aspect-ratio: 4 / 3;
   }
+
+  .tires__facts div {
+    grid-template-columns: 7rem 1fr;
+  }
+}
+
+/* "See more" plays a service in the 3D hero, so it only shows while the hero is live;
+   otherwise the card offers to book it */
+.watch,
+html[data-stage="live"] .card__book {
+  display: none;
+}
+
+html[data-stage="live"] .watch {
+  display: inline;
 }
 
 /* services: a render and a sentence for each main service */
@@ -1118,7 +1156,8 @@ button {
 }
 
 /* the links line up along the bottom of each row of cards */
-.card__book {
+.card__book,
+.card .watch {
   margin-top: auto;
   padding-top: 6px;
 }

@@ -1,4 +1,5 @@
 import { COPY } from "@/lib/copy";
+import { WatchLink } from "./WatchLink";
 
 const bookHref = (service: string) => `/book?service=${encodeURIComponent(service)}`;
 
@@ -22,6 +23,10 @@ export function Services() {
               </div>
               <h3 className="card__name">{s.name}</h3>
               <p>{s.body}</p>
+              {/* plays this service in the hero; where the hero is a still, books it instead */}
+              <WatchLink service={s.id} label={`${COPY.cta.seeMore}: ${s.name}`}>
+                {COPY.cta.seeMore}
+              </WatchLink>
               <a className="link card__book" href={bookHref(s.name)} aria-label={`${COPY.cta.bookTime} for ${s.name.toLowerCase()}`}>
                 {COPY.cta.bookTime}
               </a>

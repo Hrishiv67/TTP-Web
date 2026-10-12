@@ -1,4 +1,5 @@
 import { COPY } from "@/lib/copy";
+import { KeepTogether } from "./KeepTogether";
 import { WatchLink } from "./WatchLink";
 
 const bookHref = (service: string) => `/book?service=${encodeURIComponent(service)}`;
@@ -39,11 +40,15 @@ export function Services() {
             {also.map(([name, body]) => (
               <li className="row" key={name}>
                 <h4>{name}</h4>
-                <p>{body}</p>
+                <p>
+                  <KeepTogether text={body} />
+                </p>
               </li>
             ))}
           </ul>
-          <p className="note">{other}</p>
+          <p className="note">
+            <KeepTogether text={other} />
+          </p>
         </div>
       </div>
     </section>

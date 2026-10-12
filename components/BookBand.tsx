@@ -1,5 +1,6 @@
 import { COPY } from "@/lib/copy";
 import { CalendarIcon } from "./icons";
+import { KeepTogether } from "./KeepTogether";
 
 /** A black band between sections that asks for the booking. */
 export function BookBand() {
@@ -11,7 +12,9 @@ export function BookBand() {
           <h2 className="t-h2" id="band-title">
             {heading}
           </h2>
-          <p className="t-lede">{body}</p>
+          <p className="t-lede">
+            <KeepTogether text={body} />
+          </p>
         </div>
         <div className="band__actions">
           <a className="btn" href="/book">

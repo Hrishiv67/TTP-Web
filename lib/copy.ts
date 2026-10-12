@@ -119,7 +119,7 @@ export const COPY = {
     name: "TTP Tire",
     sizes: TTP_SIZES,
     kicker: "Our own brand",
-    body: "Our own tire, built for long haul, short haul and vocational trucks, with a smoother ride.",
+    body: "Our own tire, built for long and short haul, dump trucks and over-the-road trucks, with a smoother ride.",
     facts: [
       ["Sizes", TTP_SIZES.join(" and ")],
       ["Ply rating", "18 ply"],

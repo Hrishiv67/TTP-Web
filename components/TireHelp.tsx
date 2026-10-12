@@ -2,6 +2,7 @@ import { SHOP } from "@/lib/business";
 import { COPY } from "@/lib/copy";
 import { smsHref } from "@/lib/quote";
 import { MessageIcon } from "./icons";
+import { KeepTogether } from "./KeepTogether";
 
 /** Help working out the right tire: reading the size, and which tire goes where. */
 export function TireHelp() {
@@ -37,11 +38,15 @@ export function TireHelp() {
                 <li key={part}>
                   <b>{part}</b>
                   <h4>{label}</h4>
-                  <p>{body}</p>
+                  <p>
+                    <KeepTogether text={body} />
+                  </p>
                 </li>
               ))}
             </ol>
-            <p className="note">{sizing.note}</p>
+            <p className="note">
+              <KeepTogether text={sizing.note} />
+            </p>
           </div>
           <div className="help__col" data-reveal>
             <h3 className="t-h3">{positions.heading}</h3>

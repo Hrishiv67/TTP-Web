@@ -6,6 +6,7 @@ import { bookingSummary, openDays, slotsFor, validPhone, type BookingRequest } f
 import { DAY_NAMES, formatRange } from "@/lib/hours";
 import { ALL_SERVICES, COPY } from "@/lib/copy";
 import { smsHref, telHref } from "@/lib/quote";
+import { KeepTogether } from "./KeepTogether";
 import { useNow } from "@/lib/useNow";
 
 const C = COPY.booking;
@@ -125,7 +126,9 @@ export function BookingForm() {
     return (
       <div className="bk__result" ref={result} tabIndex={-1} role="status">
         <h2 className="t-h3">{C.success.heading}</h2>
-        <p className="t-lede">{C.success.body(status.phone, status.day, status.time)}</p>
+        <p className="t-lede">
+          <KeepTogether text={C.success.body(status.phone, status.day, status.time)} />
+        </p>
         <p>
           <button type="button" className="link" onClick={reset}>
             {C.success.another}
@@ -315,7 +318,9 @@ export function BookingForm() {
       {status.kind === "failed" ? (
         <div className="bk__result bk__result--failed" ref={result} tabIndex={-1} role="alert">
           <p className="t-h3">{BOOKING.accessKey ? C.failed.heading : C.noKey.heading}</p>
-          <p>{BOOKING.accessKey ? C.failed.body : C.noKey.body}</p>
+          <p>
+            <KeepTogether text={BOOKING.accessKey ? C.failed.body : C.noKey.body} />
+          </p>
           <p className="bk__resultActions">
             <a className="btn" href={status.sms}>
               {C.failed.text}

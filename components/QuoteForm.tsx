@@ -141,7 +141,9 @@ export function QuoteForm() {
       {sent ? (
         <div className="qf__result" ref={result} tabIndex={-1} role="status">
           <p className="t-h3">{C.result.heading}</p>
-          <p>{C.result.body}</p>
+          <p>
+            <KeepTogether text={C.result.body} />
+          </p>
           <pre className="qf__preview">{sent.body}</pre>
           <div className="qf__resultActions">
             <a className="link" href={sent.href}>

@@ -2,6 +2,7 @@ import { SECOND_LOCATION, SHOP, directionsUrl, mapEmbedUrl, oneLine } from "@/li
 import { COPY } from "@/lib/copy";
 import { telHref } from "@/lib/quote";
 import { HoursTable } from "./HoursTable";
+import { KeepTogether } from "./KeepTogether";
 import { LiveStatus } from "./LiveStatus";
 
 export function Location() {
@@ -57,7 +58,9 @@ export function Location() {
                 <br />
                 {SECOND_LOCATION.address.city}, {SECOND_LOCATION.address.region} {SECOND_LOCATION.address.postalCode}
               </address>
-              <p>{c.fayettevilleNote}</p>
+              <p>
+                <KeepTogether text={c.fayettevilleNote} />
+              </p>
               <p className="loc__links">
                 <a className="link" href={telHref(SECOND_LOCATION.phone.e164)}>
                   {SECOND_LOCATION.phone.display}

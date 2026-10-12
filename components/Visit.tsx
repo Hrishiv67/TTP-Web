@@ -1,4 +1,5 @@
 import { COPY } from "@/lib/copy";
+import { KeepTogether } from "./KeepTogether";
 
 export function Visit() {
   const { heading, steps, turnaround } = COPY.visit;
@@ -14,7 +15,9 @@ export function Visit() {
           {steps.map(([title, body]) => (
             <li key={title}>
               <h3>{title}</h3>
-              <p>{body}</p>
+              <p>
+                <KeepTogether text={body} />
+              </p>
             </li>
           ))}
         </ol>

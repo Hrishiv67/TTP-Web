@@ -469,7 +469,7 @@ export function Showroom() {
         <div className="beat beat--top beat--pick" data-beat="pick">
           <div className="wrap">
             <h2 className="t-h2 show__pickHeading">{H.pickHeading}</h2>
-            <p className="t-lede">{H.pickSub}</p>
+            <p className="t-lede">{mode === "live" ? H.pickSub : H.pickSubStatic}</p>
             <ul className="show__chips">
               {H.services.map((s) => (
                 <li key={s.id}>

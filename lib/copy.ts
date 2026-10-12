@@ -49,6 +49,8 @@ export const COPY = {
     bridge: "New tires, used tires and our own TTP Tire, plus the repairs that keep a truck on the road.",
     pickHeading: "Choose your service",
     pickSub: "Pick one, then scroll to see it up close.",
+    // the same, when the hero is a still and each button goes to that service's card
+    pickSubStatic: "Pick one to read more about it.",
     choose: "Choose a service",
     continue: "Scroll to continue",
     another: "Choose another service",

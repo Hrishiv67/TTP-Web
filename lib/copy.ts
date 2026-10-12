@@ -47,9 +47,12 @@ export const COPY = {
     hours: `Open ${WEEK.open}`,
     scroll: "Scroll to see what we do",
     bridge: "New tires, used tires and our own TTP Tire, plus the repairs that keep a truck on the road.",
-    pickHeading: "What does your truck need?",
-    pickSub: "Pick one, then keep scrolling to see how we do it.",
-    another: "See another service",
+    pickHeading: "Choose your service",
+    pickSub: "What does your truck need?",
+    choose: "Choose a service",
+    pause: "Pause animation",
+    resume: "Continue animation",
+    another: "Choose another service",
     // the services in the 3D sequence; ids match components/stage/sequence.ts, and `book`
     // is the name the booking form preselects
     services: [
@@ -115,7 +118,7 @@ export const COPY = {
     name: "TTP Tire",
     sizes: TTP_SIZES,
     kicker: "Our own brand",
-    body: "We sell our own tire. It's made for every kind of trucker, long haul or short haul, dump truck or over-the-road, and it gives a smoother ride.",
+    body: "Our own tire, built for long haul, short haul and vocational trucks, with a smoother ride.",
     facts: [
       ["Sizes", TTP_SIZES.join(" and ")],
       ["Ply rating", "18 ply"],
@@ -141,11 +144,11 @@ export const COPY = {
     main: [
       { id: "new", name: "New tires", body: "We stock top truck tire brands and our own TTP Tire, in sizes for semis, box trucks, pickups and trailers.", alt: "A new truck tire on an aluminum wheel" },
       { id: "used", name: "Used tires", body: "Every used tire is inspected before it goes on the rack, and they start at a fraction of the price of new.", alt: "A used truck tire with its tread depth marked in crayon" },
-      { id: "repair", name: "Tire repair", body: "We fix flats, punctures and slow leaks, and get you back on the road fast, often the same day.", alt: "A plug sealing a puncture in a tire's tread" },
+      { id: "repair", name: "Tire repair", body: "Flats, punctures and slow leaks, often fixed the same day.", alt: "A plug sealing a puncture in a tire's tread" },
       { id: "balance", name: "Wheel balancing", body: "Balancing stops the vibration you feel at speed and helps your tires last longer.", alt: "Balance weights clipped to the rim of a truck wheel" },
       { id: "alignment", name: "Alignment", body: "We set the alignment so the truck tracks straight. That keeps the tires from wearing unevenly and saves fuel.", alt: "A red alignment laser line across a steer tire's tread" },
       { id: "ac", name: "A/C work", body: "We diagnose and repair semi truck A/C, recharge the system and put in new compressors, so you stay cool on the road.", alt: "A truck A/C compressor" },
-      { id: "washout", name: "Trailer washouts", body: "We wash out debris, residue and buildup between loads, with a quick turnaround so you stay on schedule.", alt: "The clean inside of a trailer with its rear doors open" },
+      { id: "washout", name: "Trailer washouts", body: "Debris, residue and buildup washed out between loads, with a quick turnaround.", alt: "The clean inside of a trailer with its rear doors open" },
       { id: "maintenance", name: "General maintenance", body: "Rotations, pressure checks and tread inspections for one truck or a whole fleet.", alt: "A pressure gauge on a truck tire's valve stem" },
     ],
     alsoHeading: "We also do",
@@ -234,7 +237,7 @@ export const COPY = {
   },
 
   quote: {
-    heading: "Rather text? Get a quote by text",
+    heading: "Get a quote by text",
     intro: "Fill in what you know about the tire and the truck. Anything else can go in the notes.",
     callLine: "You can also call us at",
     fields: {
@@ -302,7 +305,7 @@ export const COPY = {
     },
     noKey: {
       heading: "Send your request by text",
-      body: `Online booking is being set up. Send your request as a text, or call ${PHONE}.`,
+      body: `Text your request to the shop, or call ${PHONE}. We'll confirm your appointment.`,
     },
     smsIntro: "Hi, I'd like to book an appointment.",
     side: {

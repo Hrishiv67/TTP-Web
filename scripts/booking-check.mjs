@@ -16,6 +16,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+page.on("requestfailed", (req) => {
+  if (/formsubmit/.test(req.url())) console.log(`The request to FormSubmit failed: ${req.failure()?.errorText}`);
+});
 
 if (OPEN_URL) {
   await page.goto(OPEN_URL, { waitUntil: "load", timeout: 60_000 });

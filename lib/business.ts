@@ -50,14 +50,16 @@ export const HOURS: Record<number, { open: number; close: number } | null> = {
 export const TIME_ZONE = "America/New_York";
 
 /**
- * Appointment requests from /book are emailed to the shop through Web3Forms
- * (web3forms.com). The access key is tied to the inbox it was created for and is
- * meant to sit in public website code. Until it's set, the form offers to send the
- * request as a text message instead.
+ * Appointment requests from /book are emailed straight to `email` by FormSubmit
+ * (formsubmit.co), from the visitor's browser. The first request to a new address sends
+ * it an "Activate Form" email instead, and requests are delivered once that button is
+ * clicked. If a request can't be sent, the form offers to send it as a text message.
+ * NEXT_PUBLIC_BOOKING_EMAIL overrides the address at build time (the booking check on
+ * GitHub Actions uses it to test with another inbox).
  */
 export const BOOKING = {
-  endpoint: "https://api.web3forms.com/submit",
-  accessKey: "",
+  email: process.env.NEXT_PUBLIC_BOOKING_EMAIL || "trucktirespros@gmail.com",
+  endpoint: "https://formsubmit.co/ajax/",
   // appointments start on the half hour, the last one 30 minutes before closing,
   // and same-day requests need at least an hour's notice
   slotMinutes: 30,

@@ -17,20 +17,28 @@ Next.js 16 (App Router), React 19, three.js, plain CSS. The pages are prerendere
 as static HTML, so they deploy to Vercel (or any static host) with no
 configuration and no environment variables.
 
-## Booking emails (set this up once)
+## Booking emails
 
-`/book` sends each appointment request to the shop's inbox through
-[Web3Forms](https://web3forms.com), a free form-to-email service, straight from the
-visitor's browser. There's no server to run.
+`/book` emails each appointment request straight to the shop at
+**trucktirespros@gmail.com** (`BOOKING.email` in `lib/business.ts`), through
+[FormSubmit](https://formsubmit.co), a free form-to-email service, from the visitor's
+browser. There's no server to run and no key to keep.
 
-1. Go to web3forms.com, enter the shop's email address, and they email an access key
-   to that inbox.
-2. Paste the key into `BOOKING.accessKey` in `lib/business.ts` and deploy.
+- **One-time activation.** The first request to a new address doesn't arrive as a
+  booking: FormSubmit sends that inbox an email with an **Activate Form** button
+  instead. Click it once and every request after that is delivered. (Check the spam
+  folder if it isn't in the inbox.)
+- **If a request can't be sent** (before activation, or if FormSubmit is down), the form
+  offers to send the same request as a text message to (910) 230-0433, or to call.
+- **Changing the address** means editing `BOOKING.email` (or setting
+  `NEXT_PUBLIC_BOOKING_EMAIL` on Vercel) and activating the new address the same way.
 
-Until a key is set, the form still works: after the customer fills it in, it offers
-to send the same request as a text message to (910) 230-0433. It does the same if
-Web3Forms is ever unreachable. The access key is meant to be public; Web3Forms only
-ever sends to the address it was created for.
+**Testing it.** GitHub Actions has a "Booking email check" workflow (Actions tab, Run
+workflow). It books a test appointment on the live booking page in a real browser and
+reports what FormSubmit answered: "sent", or "needs activation". If `to` isn't the
+address the site sends to, only that test booking goes to `to`, so another inbox can be
+tried without touching the live site. With `open_url` set, it opens a link instead (for
+example an Activate Form link). The addresses you type are hidden in the run's log.
 
 Open days and times come from `HOURS` in `lib/business.ts` (shop time, America/New_York).
 `BOOKING` sets the slot length, how far ahead people can book, and the notice needed

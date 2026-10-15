@@ -1,0 +1,53 @@
+# Books one test appointment on the live booking page in a real browser and reports what the
+# email service answered. Run it from the Actions tab: "Booking email check", Run workflow.
+# If "to" isn't the address the site sends bookings to, only this test booking goes there.
+name: Booking email check
+
+on:
+  workflow_dispatch:
+    inputs:
+      to:
+        description: The address the booking should go to
+        required: true
+        default: trucktirespros@gmail.com
+      url:
+        description: The booking page to test
+        required: true
+        default: https://truck-tire-pro.vercel.app/book
+      open_url:
+        description: Instead of booking, open this link (the Activate Form link from FormSubmit)
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      # read the inputs from the event file so the addresses never show up in the public log
+      - name: Read inputs
+        run: |
+          TO=$(jq -r '.inputs.to // ""' "$GITHUB_EVENT_PATH")
+          OPEN=$(jq -r '.inputs.open_url // ""' "$GITHUB_EVENT_PATH")
+          [ -n "$TO" ] && echo "::add-mask::$TO"
+          [ -n "$OPEN" ] && echo "::add-mask::$OPEN"
+          { echo "BOOK_TO=$TO"; echo "OPEN_URL=$OPEN"; } >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install the browser
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx playwright install --with-deps chromium
+
+      - name: Book
+        env:
+          BOOK_URL: ${{ inputs.url }}
+        run: node scripts/booking-check.mjs

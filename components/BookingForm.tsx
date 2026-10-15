@@ -80,22 +80,17 @@ export function BookingForm() {
       return;
     }
     const r = request();
-    if (!BOOKING.accessKey) {
-      setStatus({ kind: "failed", sms: smsHref(SHOP.phone.e164, smsBody()) });
-      return;
-    }
     setStatus({ kind: "sending" });
     const honeypot = (ev.currentTarget.elements.namedItem("botcheck") as HTMLInputElement | null)?.checked ?? false;
     try {
-      const res = await fetch(BOOKING.endpoint, {
+      const res = await fetch(BOOKING.endpoint + BOOKING.email, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
-          access_key: BOOKING.accessKey,
-          subject: `Appointment request: ${r.service}, ${r.day} at ${r.time}`,
-          from_name: `${SHOP.name} website`,
-          botcheck: honeypot,
-          ...(r.email.trim() ? { replyto: r.email.trim() } : {}),
+          _subject: `Appointment request: ${r.service}, ${r.day} at ${r.time}`,
+          _template: "table",
+          // FormSubmit drops anything with this filled in, which only bots do
+          _honey: honeypot ? "on" : "",
           Service: r.service,
           Vehicle: r.vehicle,
           "Tire size": r.size.toUpperCase() || "Not given",
@@ -103,12 +98,16 @@ export function BookingForm() {
           Time: r.time,
           Name: r.name.trim(),
           Phone: r.phone.trim(),
-          Email: r.email.trim() || "Not given",
+          // FormSubmit makes a field called "email" the reply-to address, so the shop can
+          // answer the customer straight from the booking email
+          ...(r.email.trim() ? { email: r.email.trim() } : {}),
           Notes: r.notes.trim() || "None",
         }),
       });
+      // FormSubmit answers {"success": "true"} as a string, and "false" (with a message)
+      // when the request wasn't delivered, as before the address has been activated
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) throw new Error(data.message || `HTTP ${res.status}`);
+      if (!res.ok || String(data.success) !== "true") throw new Error(data.message || `HTTP ${res.status}`);
       setStatus({ kind: "sent", phone: r.phone.trim(), day: r.day, time: r.time });
     } catch {
       setStatus({ kind: "failed", sms: smsHref(SHOP.phone.e164, smsBody()) });
@@ -317,9 +316,9 @@ export function BookingForm() {
 
       {status.kind === "failed" ? (
         <div className="bk__result bk__result--failed" ref={result} tabIndex={-1} role="alert">
-          <p className="t-h3">{BOOKING.accessKey ? C.failed.heading : C.noKey.heading}</p>
+          <p className="t-h3">{C.failed.heading}</p>
           <p>
-            <KeepTogether text={BOOKING.accessKey ? C.failed.body : C.noKey.body} />
+            <KeepTogether text={C.failed.body} />
           </p>
           <p className="bk__resultActions">
             <a className="btn" href={status.sms}>

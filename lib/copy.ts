@@ -302,10 +302,6 @@ export const COPY = {
       text: "Send as a text",
       call: `Call ${PHONE}`,
     },
-    noKey: {
-      heading: "Send your request by text",
-      body: `Text your request to the shop, or call ${PHONE}. We'll confirm your appointment.`,
-    },
     smsIntro: "Hi, I'd like to book an appointment.",
     side: {
       hoursHeading: "Hours",

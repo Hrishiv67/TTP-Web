@@ -1,5 +1,5 @@
-import { confirmBooking, updateLedger } from "@/lib/slots";
-import { bookingRef, withDeadline } from "@/lib/slotStore";
+import { confirmBooking, findBooking, updateLedger } from "@/lib/slots";
+import { bookingRef, forgetFullSlots, keyMatches, withDeadline } from "@/lib/slotStore";
 
 export const dynamic = "force-dynamic";
 
@@ -9,13 +9,17 @@ export async function POST(req: Request) {
   const ref = bookingRef({ slot: body?.slot, id: body?.id, sig: body?.sig });
   if (ref instanceof Response) return ref;
   try {
-    const found = await withDeadline(
+    const answer = await withDeadline(
       updateLedger(ref.store, (ledger) => {
-        const { found, changed } = confirmBooking(ledger, ref.slot, ref.id);
-        return { changed, result: found };
+        const booking = findBooking(ledger, ref.slot, ref.id);
+        if (!booking) return { changed: false, result: "gone" as const };
+        if (!keyMatches(booking, ref.sig)) return { changed: false, result: "denied" as const };
+        return { changed: confirmBooking(ledger, ref.slot, ref.id).changed, result: "kept" as const };
       }),
     );
-    return Response.json({ ok: found }, { status: found ? 200 : 404 });
+    forgetFullSlots();
+    if (answer === "denied") return Response.json({ ok: false, reason: "invalid" }, { status: 403 });
+    return Response.json({ ok: answer === "kept" }, { status: answer === "kept" ? 200 : 404 });
   } catch (err) {
     console.error("Couldn't confirm the booking", err);
     return Response.json({ ok: false, reason: "unavailable" }, { status: 503 });

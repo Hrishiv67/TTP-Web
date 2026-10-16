@@ -39,12 +39,15 @@ export function BookingForm() {
   const [full, setFull] = useState<ReadonlySet<string>>(new Set());
   const [refused, setRefused] = useState<ReadonlySet<string>>(new Set());
 
-  const loadFull = useCallback(async () => {
+  const loadFull = useCallback(async (): Promise<ReadonlySet<string> | null> => {
     try {
       const data = await (await fetch("/api/slots", { cache: "no-store" })).json();
-      setFull(new Set(Array.isArray(data.full) ? data.full : []));
+      const next = new Set<string>(Array.isArray(data.full) ? data.full : []);
+      setFull(next);
+      return next;
     } catch {
       // without the list every time looks open; holding a place still checks
+      return null;
     }
   }, []);
   useEffect(() => {
@@ -132,8 +135,12 @@ export function BookingForm() {
         const key = slotKey(dayIso, time);
         const nextRefused = new Set(refused).add(key);
         setRefused(nextRefused);
-        await loadFull();
-        const dayGone = slots.every((s) => s.value === time || nextRefused.has(slotKey(dayIso, s.value)) || full.has(slotKey(dayIso, s.value)));
+        // a refusal brings the up-to-date full times; otherwise ask for them
+        let latest: ReadonlySet<string> | null = Array.isArray(data.full) ? new Set<string>(data.full) : null;
+        if (latest) setFull(latest);
+        else latest = await loadFull();
+        const known = latest ?? full;
+        const dayGone = slots.every((s) => s.value === time || nextRefused.has(slotKey(dayIso, s.value)) || known.has(slotKey(dayIso, s.value)));
         setStatus({ kind: "idle" });
         setTime("");
         if (dayGone) setDayIso("");

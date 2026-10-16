@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { BOOKING, HOURS, TIME_ZONE } from "@/lib/business";
 import { openDays, shopToday, slotsFor, validPhone } from "@/lib/booking";
-import { addBooking, HOLD_MINUTES, prune, slotKey, updateLedger, visitorCount } from "@/lib/slots";
-import { ledgerStore, signBooking, visitorTag, withDeadline } from "@/lib/slotStore";
+import { addBooking, fullSlots, HOLD_MINUTES, prune, slotKey, updateLedger, visitorCount, type SlotKey } from "@/lib/slots";
+import { forgetFullSlots, ledgerStore, newBookingKey, visitorTag, withDeadline } from "@/lib/slotStore";
 
 export const dynamic = "force-dynamic";
 
@@ -37,20 +37,25 @@ export async function POST(req: Request) {
   if (!store) return Response.json({ ok: true, checked: false });
   const key = slotKey(day, time);
   const id = randomUUID();
+  const linkKey = newBookingKey();
   const visitor = visitorTag(req);
   const until = new Date(now.getTime() + HOLD_MINUTES * 60_000).toISOString();
   try {
+    let full: SlotKey[] = [];
     const answer = await withDeadline(
       updateLedger(store, (ledger) => {
         const pruned = prune(ledger, shopToday(now, TIME_ZONE), now.getTime());
         if (visitorCount(ledger, visitor, now.getTime()) >= MAX_PER_VISITOR) return { changed: pruned, result: "busy" as const };
-        const added = addBooking(ledger, key, { id, name, phone, service, at: now.toISOString(), visitor, until }, BOOKING.perSlot, now.getTime());
+        const added = addBooking(ledger, key, { id, name, phone, service, at: now.toISOString(), visitor, until, key: linkKey }, BOOKING.perSlot, now.getTime());
+        // the up-to-date full times go back with a refusal, so the page doesn't rely on a cached list
+        if (!added) full = fullSlots(ledger, BOOKING.perSlot, now.getTime());
         return { changed: added || pruned, result: added ? ("held" as const) : ("full" as const) };
       }),
     );
-    if (answer === "full") return Response.json({ ok: false, reason: "full" }, { status: 409 });
+    forgetFullSlots();
+    if (answer === "full") return Response.json({ ok: false, reason: "full", full }, { status: 409 });
     if (answer === "busy") return Response.json({ ok: false, reason: "busy" }, { status: 429 });
-    return Response.json({ ok: true, checked: true, slot: key, id, sig: signBooking(key, id) });
+    return Response.json({ ok: true, checked: true, slot: key, id, sig: linkKey });
   } catch (err) {
     console.error("Couldn't hold the time", err);
     return Response.json({ ok: true, checked: false });

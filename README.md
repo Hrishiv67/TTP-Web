@@ -59,9 +59,14 @@ time full shows as Full too.
   that shows who booked and asks before freeing the place (so email apps that open links
   on their own can't cancel anything).
 - **Setup (once).** In Vercel: project **truck-tire-pro**, **Storage**, **Create**,
-  **Blob**, access **Private**, and connect it to the project. That adds
-  `BLOB_READ_WRITE_TOKEN`; the next deploy picks it up. Without it the site still takes
-  bookings, it just can't check for full times, and each booking email says so.
+  **Blob**, access **Private**, and connect it to the project. That adds `BLOB_STORE_ID`
+  (the site signs in to the store through Vercel itself; older setups add
+  `BLOB_READ_WRITE_TOKEN` instead, which works too); the next deploy picks it up. Without a
+  store the site still takes bookings, it just can't check for full times, and each
+  booking email says so.
+- **Links.** Each booking gets its own random key, kept only in the private file; the
+  "Free up this time" link carries it, so a link can't be made up for someone else's
+  booking.
 - **Checking it.** The "Booking email check" workflow with `check: slots` holds the last
   time on the last open day once more than it takes, checks the extra one is refused, the
   time shows as full and a hold can be confirmed, then frees all of them. It sends no email.

@@ -19,6 +19,8 @@ export type Booking = {
   at: string;
   /** a hash of the visitor's address, to cap how many places one visitor can hold */
   visitor?: string;
+  /** the random key in this booking's links (confirm, free up); never sent anywhere else */
+  key?: string;
   /**
    * Set while the booking email goes out: the place lapses at this time unless the page
    * confirms the email was sent, so a closed tab or a lost email can't keep it forever.

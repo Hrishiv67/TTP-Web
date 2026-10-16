@@ -1,7 +1,9 @@
 import { findBooking, isLive, readLedger, removeBooking, updateLedger } from "@/lib/slots";
-import { bookingRef, withDeadline } from "@/lib/slotStore";
+import { bookingRef, forgetFullSlots, keyMatches, withDeadline } from "@/lib/slotStore";
 
 export const dynamic = "force-dynamic";
+
+const denied = () => Response.json({ ok: false, reason: "invalid" }, { status: 403 });
 
 /** What a "Free up this time" link points to, for the page that asks to confirm. */
 export async function GET(req: Request) {
@@ -10,6 +12,7 @@ export async function GET(req: Request) {
   if (ref instanceof Response) return ref;
   try {
     const booking = findBooking(await withDeadline(readLedger(ref.store)), ref.slot, ref.id);
+    if (booking && !keyMatches(booking, ref.sig)) return denied();
     const live = booking && isLive(booking, Date.now());
     return Response.json({ ok: true, slot: ref.slot, booking: live ? { name: booking.name, service: booking.service } : null });
   } catch (err) {
@@ -24,13 +27,18 @@ export async function POST(req: Request) {
   const ref = bookingRef({ slot: body?.slot, id: body?.id, sig: body?.sig });
   if (ref instanceof Response) return ref;
   try {
-    const removed = await withDeadline(
+    const answer = await withDeadline(
       updateLedger(ref.store, (ledger) => {
-        const gone = removeBooking(ledger, ref.slot, ref.id);
-        return { changed: gone, result: gone };
+        const booking = findBooking(ledger, ref.slot, ref.id);
+        if (!booking) return { changed: false, result: "gone" as const };
+        if (!keyMatches(booking, ref.sig)) return { changed: false, result: "denied" as const };
+        removeBooking(ledger, ref.slot, ref.id);
+        return { changed: true, result: "freed" as const };
       }),
     );
-    return Response.json({ ok: true, removed });
+    forgetFullSlots();
+    if (answer === "denied") return denied();
+    return Response.json({ ok: true, removed: answer === "freed" });
   } catch (err) {
     console.error("Couldn't free the time", err);
     return Response.json({ ok: false, reason: "unavailable" }, { status: 503 });

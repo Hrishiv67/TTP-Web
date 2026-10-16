@@ -22,7 +22,7 @@ const fail = (msg) => {
 
 const first = await fullTimes();
 if (!first.checking) {
-  fail("The site isn't checking for full times: the Blob store isn't connected to the project (no BLOB_READ_WRITE_TOKEN), or it can't be reached.");
+  fail("The site isn't checking for full times: the Blob store isn't connected to the project (no BLOB_STORE_ID or BLOB_READ_WRITE_TOKEN in the deploy), or it can't be reached.");
   process.exit();
 }
 

@@ -58,7 +58,7 @@ export const TIME_ZONE = "America/New_York";
  * GitHub Actions uses it to test with another inbox).
  */
 export const BOOKING = {
-  email: process.env.NEXT_PUBLIC_BOOKING_EMAIL || "hrishiv14@gmail.com",
+  email: process.env.NEXT_PUBLIC_BOOKING_EMAIL || "trucktirespros@gmail.com",
   endpoint: "https://formsubmit.co/ajax/",
   // appointments start on the half hour, the last one 30 minutes before closing,
   // and same-day requests need at least an hour's notice

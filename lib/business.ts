@@ -66,4 +66,7 @@ export const BOOKING = {
   lastSlotBeforeClose: 30,
   leadMinutes: 60,
   daysAhead: 12,
+  // how many trucks the shop takes at the same start time; a time is full after that many
+  // bookings (see lib/slots.ts)
+  perSlot: 3,
 };

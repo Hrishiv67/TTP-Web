@@ -2086,6 +2086,37 @@ fieldset.field legend {
   outline-offset: 3px;
 }
 
+/* a time, or a whole day, that already has as many trucks as the shop takes */
+.chip input:disabled {
+  cursor: not-allowed;
+}
+
+.chip input:disabled + span {
+  border-style: dashed;
+  text-decoration: line-through;
+  background: repeating-linear-gradient(-45deg, transparent 0 7px, rgb(22 19 15 / 7%) 7px 8px);
+}
+
+.chip__full {
+  display: inline-block;
+  margin-left: 8px;
+  font-style: normal;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* the "Free up this time" page */
+.cancelpage {
+  padding: calc(var(--masthead) + clamp(40px, 6vw, 96px)) 0 clamp(88px, 10vw, 160px);
+}
+
+.cancelpage__body {
+  max-width: 640px;
+  display: grid;
+  gap: 18px;
+  justify-items: start;
+}
+
 .field [aria-invalid="true"] {
   border-color: var(--red);
   box-shadow: inset 0 0 0 1px var(--red);

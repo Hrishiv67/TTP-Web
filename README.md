@@ -40,6 +40,31 @@ address the site sends to, only that test booking goes to `to`, so another inbox
 tried without touching the live site. With `open_url` set, it opens a link instead (for
 example an Activate Form link). The addresses you type are hidden in the run's log.
 
+## No double bookings
+
+Each start time takes up to **3 trucks** (`BOOKING.perSlot` in `lib/business.ts`). Once a
+time has 3 bookings it shows as **Full** on `/book` and can't be picked; a day with every
+time full shows as Full too.
+
+- **How it works.** Before the booking email goes out, the page asks `/api/book` to hold a
+  place at that time. The server keeps the upcoming bookings in one private file in
+  **Vercel Blob** (`lib/slots.ts`, `lib/slotStore.ts`) and only saves if nobody else saved
+  in between, so two people can't take the last place at once. If someone does get there
+  first, the customer sees "That time just filled up" and picks another. If the email then
+  fails, the place is let go.
+- **Cancellations.** Every booking email has a **Free up this time** link. It opens a page
+  that shows who booked and asks before freeing the place (so email apps that open links
+  on their own can't cancel anything).
+- **Setup (once).** In Vercel: project **truck-tire-pro**, **Storage**, **Create**,
+  **Blob**, access **Private**, and connect it to the project. That adds
+  `BLOB_READ_WRITE_TOKEN`; the next deploy picks it up. Without it the site still takes
+  bookings, it just can't check for full times, and each booking email says so.
+- **Checking it.** The "Booking email check" workflow with `check: slots` holds the last
+  time on the last open day once more than it takes, checks the extra one is refused and
+  the time shows as full, then frees all of them. It sends no email.
+- Bookings made by phone or walk-in aren't in the file, so they don't count toward the 3.
+  In local development (`npm run dev`) the bookings are kept in memory.
+
 Open days and times come from `HOURS` in `lib/business.ts` (shop time, America/New_York).
 `BOOKING` sets the slot length, how far ahead people can book, and the notice needed
 for a same-day slot. Requests are requests: the shop calls to confirm.

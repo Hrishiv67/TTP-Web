@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bookingSummary, openDays, slotsFor, validPhone } from "./booking.ts";
+import { bookingSummary, openDays, slotsFor, validPhone, validEmail } from "./booking.ts";
 import { BOOKING, HOURS, TIME_ZONE } from "./business.ts";
 
 const days = (iso: string) => openDays(new Date(iso), HOURS, TIME_ZONE, BOOKING);
@@ -66,4 +66,9 @@ test("on a Sunday, the first choice is Monday, tomorrow", () => {
   const d = days("2026-10-18T16:00:00Z"); // Sun 12:00
   assert.equal(d[0].iso, "2026-10-19");
   assert.match(d[0].label, /^Tomorrow, Oct 19/);
+});
+
+test("an optional email has to look like one before it becomes the reply-to", () => {
+  for (const ok of ["mike@gmail.com", " a@b.co "]) assert.equal(validEmail(ok), true, ok);
+  for (const bad of ["mike@gmail,com", "none", "N/A", "mike@gmail", "@gmail.com"]) assert.equal(validEmail(bad), false, bad);
 });

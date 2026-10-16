@@ -6,6 +6,11 @@ name: Booking email check
 on:
   workflow_dispatch:
     inputs:
+      check:
+        description: "booking: send a test booking email. slots: check that full times can't be booked (sends no email)"
+        type: choice
+        options: [booking, slots]
+        default: booking
       to:
         description: The address the booking should go to
         required: true
@@ -42,18 +47,25 @@ jobs:
         with:
           node-version: 22
 
+      - name: Check full times can't be booked
+        if: inputs.check == 'slots'
+        run: node scripts/slot-check.mjs
+
       - name: Install the browser
+        if: inputs.check != 'slots'
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
           npx playwright install --with-deps chromium
 
       - name: Can this machine reach FormSubmit
+        if: inputs.check != 'slots'
         continue-on-error: true
         run: |
           getent hosts formsubmit.co || echo "formsubmit.co doesn't resolve"
           curl -sS -m 20 -o /dev/null -w "formsubmit.co answered HTTP %{http_code}\n" https://formsubmit.co/ || true
 
       - name: Book
+        if: inputs.check != 'slots'
         env:
           BOOK_URL: ${{ inputs.url }}
         run: node scripts/booking-check.mjs

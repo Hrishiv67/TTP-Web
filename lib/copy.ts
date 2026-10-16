@@ -280,6 +280,14 @@ export const COPY = {
       notes: { label: "Anything else", hint: "Optional: what happened, how many tires" },
     },
     loadingDays: "Loading open days",
+    // a time (or a whole day) that already has as many trucks as the shop takes
+    full: "Full",
+    taken: "That time just filled up. Pick another one.",
+    // rows in the booking email: a link the shop can use if the customer cancels, or a note
+    // when the bookings couldn't be checked
+    freeLink: "Free up this time",
+    uncheckedLabel: "Time check",
+    unchecked: "Couldn't check whether this time was still open",
     pickDay: "Pick a day first",
     submit: "Request appointment",
     sending: "Sending",
@@ -289,6 +297,7 @@ export const COPY = {
       time: "Pick a time.",
       name: "Tell us your name.",
       phone: "Enter a 10-digit phone number.",
+      email: "Check the email address, or leave it blank.",
     },
     success: {
       heading: "Request sent",
@@ -315,6 +324,22 @@ export const COPY = {
   sms: {
     greeting: "Hi, this is a quote request from your website.",
     sidewall: "Hi, here's a photo of my tire's sidewall. Can you tell me what fits?",
+  },
+
+  // the page behind the "Free up this time" link in each booking email
+  cancel: {
+    title: `Free up a booked time | ${SHOP.name}`,
+    heading: "Free up a booked time",
+    loading: "Looking up the booking",
+    ask: (when: string) => `Free up ${when} so someone else can book it?`,
+    who: (name: string, service: string) => `Booked by ${name}${service ? ` for ${service.toLowerCase()}` : ""}.`,
+    confirm: "Free up this time",
+    freeing: "Freeing it up",
+    done: (when: string) => `Done. ${when} is open for booking again.`,
+    gone: "This booking was already freed up, or its day has passed.",
+    invalid: "This link isn't complete. Open it again from the booking email.",
+    error: "The bookings couldn't be reached just now. Try again in a minute.",
+    back: "Back to the website",
   },
 
   footer: {

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { BOOKING, HOURS, SHOP, TIME_ZONE } from "@/lib/business";
-import { bookingSummary, openDays, slotsFor, validPhone, type BookingRequest } from "@/lib/booking";
+import { bookingSummary, openDays, slotsFor, validEmail, validPhone, type BookingRequest } from "@/lib/booking";
 import { DAY_NAMES, formatRange } from "@/lib/hours";
 import { ALL_SERVICES, COPY } from "@/lib/copy";
 import { smsHref, telHref } from "@/lib/quote";
+import { slotKey } from "@/lib/slots";
 import { KeepTogether } from "./KeepTogether";
 import { useNow } from "@/lib/useNow";
 
@@ -13,6 +14,8 @@ const C = COPY.booking;
 const F = C.fields;
 
 type Status = { kind: "idle" } | { kind: "sending" } | { kind: "sent"; phone: string; day: string; time: string } | { kind: "failed"; sms: string };
+/** A place held at a time by /api/book; `checked` is false when the bookings couldn't be checked. */
+type Hold = { checked: boolean; slot?: string; id?: string; sig?: string };
 
 export function BookingForm() {
   const now = useNow();
@@ -31,12 +34,32 @@ export function BookingForm() {
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const result = useRef<HTMLDivElement>(null);
   const firstError = useRef<HTMLElement | null>(null);
+  // times that already have as many trucks as the shop takes (BOOKING.perSlot)
+  const [full, setFull] = useState<ReadonlySet<string>>(new Set());
+
+  const loadFull = useCallback(async () => {
+    try {
+      const data = await (await fetch("/api/slots", { cache: "no-store" })).json();
+      setFull(new Set(Array.isArray(data.full) ? data.full : []));
+    } catch {
+      // without the list every time looks open; holding a place still checks
+    }
+  }, []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches the booked times once, in the browser
+    void loadFull();
+  }, [loadFull]);
 
   // open days and times depend on the shop's clock, so they only exist in the browser
   const days = useMemo(() => (now === null ? [] : openDays(new Date(now), HOURS, TIME_ZONE, BOOKING)), [now]);
-  const day = days.find((d) => d.iso === dayIso);
+  const fullDays = useMemo(
+    () => new Set(now === null ? [] : days.filter((d) => slotsFor(d, new Date(now), HOURS, TIME_ZONE, BOOKING).every((s) => full.has(slotKey(d.iso, s.value)))).map((d) => d.iso)),
+    [days, full, now],
+  );
+  const day = days.find((d) => d.iso === dayIso && !fullDays.has(d.iso));
   const slots = useMemo(() => (day && now !== null ? slotsFor(day, new Date(now), HOURS, TIME_ZONE, BOOKING) : []), [day, now]);
-  const slot = slots.find((s) => s.value === time);
+  const isFull = (value: string) => !!day && full.has(slotKey(day.iso, value));
+  const slot = slots.find((s) => s.value === time && !isFull(s.value));
 
   // if the clock moves on past the chosen day or time, `day` or `slot` comes back empty and
   // the form asks for a new one
@@ -65,6 +88,7 @@ export function BookingForm() {
     if (!slot) e.time = C.errors.time;
     if (!name.trim()) e.name = C.errors.name;
     if (!validPhone(phone)) e.phone = C.errors.phone;
+    if (email.trim() && !validEmail(email)) e.email = C.errors.email;
     setErrors(e);
     return e;
   };
@@ -79,9 +103,35 @@ export function BookingForm() {
       firstError.current = el;
       return;
     }
+    const form = ev.currentTarget;
     const r = request();
     setStatus({ kind: "sending" });
-    const honeypot = (ev.currentTarget.elements.namedItem("botcheck") as HTMLInputElement | null)?.checked ?? false;
+    const honeypot = (form.elements.namedItem("botcheck") as HTMLInputElement | null)?.checked ?? false;
+
+    // hold a place at the time first, so it can't fill up while the email goes out
+    let hold: Hold = { checked: false };
+    try {
+      const res = await fetch("/api/book", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ day: dayIso, time, name: r.name, phone: r.phone, service: r.service }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409 || data.reason === "unavailable") {
+        // taken (or passed) since the page loaded: ask for another time
+        setStatus({ kind: "idle" });
+        setTime("");
+        setErrors({ time: C.taken });
+        await loadFull();
+        requestAnimationFrame(() => form.querySelector<HTMLElement>('[data-field="time"]')?.focus());
+        return;
+      }
+      if (res.ok && data.ok) hold = data;
+    } catch {
+      // the check couldn't be reached: send the booking anyway, marked unchecked
+    }
+    const freeLink = hold.checked && hold.slot && hold.id && hold.sig ? `${window.location.origin}/cancel?${new URLSearchParams({ slot: hold.slot, id: hold.id, sig: hold.sig })}` : "";
+
     try {
       const res = await fetch(BOOKING.endpoint + BOOKING.email, {
         method: "POST",
@@ -102,6 +152,7 @@ export function BookingForm() {
           // answer the customer straight from the booking email
           ...(r.email.trim() ? { email: r.email.trim() } : {}),
           Notes: r.notes.trim() || "None",
+          ...(freeLink ? { [C.freeLink]: freeLink } : { [C.uncheckedLabel]: C.unchecked }),
         }),
       });
       // FormSubmit answers {"success": "true"} as a string, and "false" (with a message)
@@ -109,7 +160,17 @@ export function BookingForm() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || String(data.success) !== "true") throw new Error(data.message || `HTTP ${res.status}`);
       setStatus({ kind: "sent", phone: r.phone.trim(), day: r.day, time: r.time });
+      void loadFull();
     } catch {
+      // the shop never got it, so don't keep the place
+      if (hold.id) {
+        void fetch("/api/release", {
+          method: "POST",
+          keepalive: true,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slot: hold.slot, id: hold.id, sig: hold.sig }),
+        }).catch(() => {});
+      }
       setStatus({ kind: "failed", sms: smsHref(SHOP.phone.e164, smsBody()) });
     }
   };
@@ -175,23 +236,30 @@ export function BookingForm() {
           <p className="field__hint">{C.loadingDays}</p>
         ) : (
           <div className="chips">
-            {days.map((d, i) => (
-              <label key={d.iso} className="chip">
-                <input
-                  type="radio"
-                  name="day"
-                  value={d.iso}
-                  checked={dayIso === d.iso}
-                  onChange={() => {
-                    setDayIso(d.iso);
-                    setTime("");
-                    setErrors((x) => ({ ...x, day: undefined }));
-                  }}
-                  data-field={i === 0 ? "day" : undefined}
-                />
-                <span>{d.label}</span>
-              </label>
-            ))}
+            {days.map((d) => {
+              const dayFull = fullDays.has(d.iso);
+              return (
+                <label key={d.iso} className="chip">
+                  <input
+                    type="radio"
+                    name="day"
+                    value={d.iso}
+                    checked={dayIso === d.iso && !dayFull}
+                    disabled={dayFull}
+                    onChange={() => {
+                      setDayIso(d.iso);
+                      setTime("");
+                      setErrors((x) => ({ ...x, day: undefined }));
+                    }}
+                    data-field={d.iso === days.find((x) => !fullDays.has(x.iso))?.iso ? "day" : undefined}
+                  />
+                  <span>
+                    {d.label}
+                    {dayFull ? <em className="chip__full">{C.full}</em> : null}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         )}
         {err("day")}
@@ -203,22 +271,29 @@ export function BookingForm() {
           <p className="field__hint">{C.pickDay}</p>
         ) : (
           <div className="chips chips--times">
-            {slots.map((s, i) => (
-              <label key={s.value} className="chip">
-                <input
-                  type="radio"
-                  name="time"
-                  value={s.value}
-                  checked={time === s.value}
-                  onChange={() => {
-                    setTime(s.value);
-                    setErrors((x) => ({ ...x, time: undefined }));
-                  }}
-                  data-field={i === 0 ? "time" : undefined}
-                />
-                <span>{s.label}</span>
-              </label>
-            ))}
+            {slots.map((s) => {
+              const taken = isFull(s.value);
+              return (
+                <label key={s.value} className="chip">
+                  <input
+                    type="radio"
+                    name="time"
+                    value={s.value}
+                    checked={time === s.value && !taken}
+                    disabled={taken}
+                    onChange={() => {
+                      setTime(s.value);
+                      setErrors((x) => ({ ...x, time: undefined }));
+                    }}
+                    data-field={s.value === slots.find((x) => !isFull(x.value))?.value ? "time" : undefined}
+                  />
+                  <span>
+                    {s.label}
+                    {taken ? <em className="chip__full">{C.full}</em> : null}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         )}
         {day ? (
@@ -294,7 +369,17 @@ export function BookingForm() {
         <span className="field__hint" id={id("email-hint")}>
           {F.email.hint}
         </span>
-        <input id={id("email")} type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} aria-describedby={id("email-hint")} />
+        <input
+          id={id("email")}
+          type="email"
+          autoComplete="email"
+          data-field="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          aria-invalid={!!errors.email}
+          aria-describedby={describedBy("email", true)}
+        />
+        {err("email")}
       </div>
 
       <div className="field">

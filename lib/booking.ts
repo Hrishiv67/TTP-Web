@@ -18,6 +18,12 @@ function shopDate(date: Date, timeZone: string): [number, number, number] {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
+/** Today's date on the shop's clock, as YYYY-MM-DD (the same form as Day.iso). */
+export function shopToday(now: Date, timeZone: string): string {
+  const [y, mo, d] = shopDate(now, timeZone);
+  return `${y}-${pad(mo)}-${pad(d)}`;
+}
+
 /** Slots on a given weekday, as minutes after midnight. */
 function daySlots(schedule: Schedule, weekday: number, rules: BookingRules): number[] {
   const hours = schedule[weekday];
@@ -93,6 +99,9 @@ export function bookingSummary(r: BookingRequest): string {
     .map(([k, v]) => `${k}: ${v}`)
     .join("\n");
 }
+
+/** Something shaped like an email address (it becomes the reply-to on the booking email). */
+export const validEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
 
 /** US phone numbers: 10 digits, optionally with a leading 1. */
 export const validPhone = (s: string) => /^1?\d{10}$/.test(s.replace(/\D/g, ""));

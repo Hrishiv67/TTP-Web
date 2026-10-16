@@ -283,6 +283,8 @@ export const COPY = {
     // a time (or a whole day) that already has as many trucks as the shop takes
     full: "Full",
     taken: "That time just filled up. Pick another one.",
+    dayTaken: "That day just filled up. Pick another day.",
+    passed: "That time isn't available anymore. Pick another one.",
     // rows in the booking email: a link the shop can use if the customer cancels, or a note
     // when the bookings couldn't be checked
     freeLink: "Free up this time",

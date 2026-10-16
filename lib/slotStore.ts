@@ -9,7 +9,7 @@
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { BlobError, BlobPreconditionFailedError, get, put } from "@vercel/blob";
-import { memoryStore, WriteConflict, type LedgerStore, type SlotKey } from "./slots";
+import { isSlotKey, memoryStore, WriteConflict, type LedgerStore, type SlotKey } from "./slots";
 
 const PATH = "bookings/ledger.json";
 
@@ -63,4 +63,24 @@ export function validSignature(key: SlotKey, id: string, sig: unknown): boolean 
   const want = Buffer.from(signBooking(key, id));
   const got = Buffer.from(sig);
   return want.length === got.length && timingSafeEqual(want, got);
+}
+
+/** A booking a signed link or request points to, or a Response saying why not. */
+export function bookingRef({ slot, id, sig }: { slot: unknown; id: unknown; sig: unknown }) {
+  if (!isSlotKey(slot) || typeof id !== "string" || !id) return Response.json({ ok: false, reason: "invalid" }, { status: 400 });
+  if (!validSignature(slot, id, sig)) return Response.json({ ok: false, reason: "invalid" }, { status: 403 });
+  const store = ledgerStore();
+  if (!store) return Response.json({ ok: false, reason: "unavailable" }, { status: 503 });
+  return { slot, id, store };
+}
+
+/** A short, one-way tag for the visitor's address (never the address itself). */
+export function visitorTag(req: Request): string {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || req.headers.get("x-real-ip") || "unknown";
+  return createHmac("sha256", secret()).update(`ttp-visitor|${ip}`).digest("base64url").slice(0, 16);
+}
+
+/** Gives up on slow storage after `ms`, so a request never hangs waiting on it. */
+export function withDeadline<T>(work: Promise<T>, ms = 8000): Promise<T> {
+  return Promise.race([work, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`No answer from storage in ${ms} ms`)), ms))]);
 }

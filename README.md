@@ -50,8 +50,11 @@ time full shows as Full too.
   place at that time. The server keeps the upcoming bookings in one private file in
   **Vercel Blob** (`lib/slots.ts`, `lib/slotStore.ts`) and only saves if nobody else saved
   in between, so two people can't take the last place at once. If someone does get there
-  first, the customer sees "That time just filled up" and picks another. If the email then
-  fails, the place is let go.
+  first, the customer sees "That time just filled up" and picks another. Once the email goes
+  out the place is kept for good; if FormSubmit refuses it, the place is let go; and a place
+  whose email never went out (a closed tab, a dropped connection) lapses after 15 minutes.
+- **Abuse limits.** One visitor (by internet address) can hold up to 6 places at once, and
+  bots that fill in the form's hidden field are told it worked without holding anything.
 - **Cancellations.** Every booking email has a **Free up this time** link. It opens a page
   that shows who booked and asks before freeing the place (so email apps that open links
   on their own can't cancel anything).
@@ -60,8 +63,8 @@ time full shows as Full too.
   `BLOB_READ_WRITE_TOKEN`; the next deploy picks it up. Without it the site still takes
   bookings, it just can't check for full times, and each booking email says so.
 - **Checking it.** The "Booking email check" workflow with `check: slots` holds the last
-  time on the last open day once more than it takes, checks the extra one is refused and
-  the time shows as full, then frees all of them. It sends no email.
+  time on the last open day once more than it takes, checks the extra one is refused, the
+  time shows as full and a hold can be confirmed, then frees all of them. It sends no email.
 - Bookings made by phone or walk-in aren't in the file, so they don't count toward the 3.
   In local development (`npm run dev`) the bookings are kept in memory.
 

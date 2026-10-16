@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  addBooking, findBooking, fullSlots, isSlotKey, memoryStore, parseLedger, prune, readLedger, removeBooking, slotKey,
-  updateLedger, WriteConflict, type Booking, type Ledger,
+  addBooking, confirmBooking, findBooking, fullSlots, isSlotKey, memoryStore, parseLedger, prune, readLedger, removeBooking,
+  slotKey, updateLedger, visitorCount, WriteConflict, type Booking, type Ledger,
 } from "./slots.ts";
 
 const booking = (id: string): Booking => ({ id, name: `Driver ${id}`, phone: "9105550100", service: "Tire repair", at: "2026-10-15T12:00:00Z" });
@@ -79,4 +79,45 @@ test("an unchanged ledger isn't written", async () => {
   const found = await updateLedger(store, (ledger) => ({ changed: false, result: findBooking(ledger, KEY, "x") }));
   assert.equal(found, undefined);
   assert.equal(writes, 0);
+});
+
+const NOW = Date.parse("2026-10-16T12:00:00Z");
+const held = (id: string, minutesLeft: number, visitor = "v1"): Booking => ({ ...booking(id), visitor, until: new Date(NOW + minutesLeft * 60_000).toISOString() });
+
+test("a hold that lapsed doesn't count, and pruning clears it", () => {
+  const ledger: Ledger = { slots: {} };
+  addBooking(ledger, KEY, held("a", -1), 3, NOW);
+  addBooking(ledger, KEY, held("b", 10), 3, NOW);
+  addBooking(ledger, KEY, booking("c"), 3, NOW);
+  assert.deepEqual(fullSlots(ledger, 3, NOW), []);
+  assert.equal(addBooking(ledger, KEY, booking("d"), 3, NOW), true);
+  assert.deepEqual(fullSlots(ledger, 3, NOW), [KEY]);
+  assert.equal(prune(ledger, "2026-10-16", NOW), true);
+  assert.deepEqual(ledger.slots[KEY].map((b) => b.id), ["b", "c", "d"]);
+});
+
+test("confirming a hold keeps the place after the hold would have lapsed", () => {
+  const ledger: Ledger = { slots: {} };
+  addBooking(ledger, KEY, held("a", 10), 1, NOW);
+  assert.deepEqual(confirmBooking(ledger, KEY, "a"), { found: true, changed: true });
+  assert.deepEqual(confirmBooking(ledger, KEY, "a"), { found: true, changed: false });
+  assert.deepEqual(fullSlots(ledger, 1, NOW + 60 * 60_000), [KEY]);
+  assert.deepEqual(confirmBooking(ledger, KEY, "nope"), { found: false, changed: false });
+});
+
+test("adding the same booking twice doesn't double it", () => {
+  const ledger: Ledger = { slots: {} };
+  assert.equal(addBooking(ledger, KEY, booking("a"), 3, NOW), true);
+  assert.equal(addBooking(ledger, KEY, booking("a"), 3, NOW), true);
+  assert.equal(ledger.slots[KEY].length, 1);
+});
+
+test("one visitor's places are counted across times, lapsed holds left out", () => {
+  const ledger: Ledger = { slots: {} };
+  addBooking(ledger, KEY, held("a", 10, "v1"), 3, NOW);
+  addBooking(ledger, slotKey("2026-10-17", "09:00"), held("b", 10, "v1"), 3, NOW);
+  addBooking(ledger, slotKey("2026-10-17", "09:00"), held("c", -5, "v1"), 3, NOW);
+  addBooking(ledger, KEY, held("d", 10, "v2"), 3, NOW);
+  assert.equal(visitorCount(ledger, "v1", NOW), 2);
+  assert.equal(visitorCount(ledger, "v2", NOW), 1);
 });

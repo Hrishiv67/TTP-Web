@@ -34,8 +34,10 @@ export function BookingForm() {
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const result = useRef<HTMLDivElement>(null);
   const firstError = useRef<HTMLElement | null>(null);
-  // times that already have as many trucks as the shop takes (BOOKING.perSlot)
+  // times that already have as many trucks as the shop takes (BOOKING.perSlot), and times
+  // refused here since the list loaded (the list can be a few seconds behind)
   const [full, setFull] = useState<ReadonlySet<string>>(new Set());
+  const [refused, setRefused] = useState<ReadonlySet<string>>(new Set());
 
   const loadFull = useCallback(async () => {
     try {
@@ -52,13 +54,14 @@ export function BookingForm() {
 
   // open days and times depend on the shop's clock, so they only exist in the browser
   const days = useMemo(() => (now === null ? [] : openDays(new Date(now), HOURS, TIME_ZONE, BOOKING)), [now]);
+  const taken = useCallback((key: string) => full.has(key) || refused.has(key), [full, refused]);
   const fullDays = useMemo(
-    () => new Set(now === null ? [] : days.filter((d) => slotsFor(d, new Date(now), HOURS, TIME_ZONE, BOOKING).every((s) => full.has(slotKey(d.iso, s.value)))).map((d) => d.iso)),
-    [days, full, now],
+    () => new Set(now === null ? [] : days.filter((d) => slotsFor(d, new Date(now), HOURS, TIME_ZONE, BOOKING).every((s) => taken(slotKey(d.iso, s.value)))).map((d) => d.iso)),
+    [days, taken, now],
   );
   const day = days.find((d) => d.iso === dayIso && !fullDays.has(d.iso));
   const slots = useMemo(() => (day && now !== null ? slotsFor(day, new Date(now), HOURS, TIME_ZONE, BOOKING) : []), [day, now]);
-  const isFull = (value: string) => !!day && full.has(slotKey(day.iso, value));
+  const isFull = (value: string) => !!day && taken(slotKey(day.iso, value));
   const slot = slots.find((s) => s.value === time && !isFull(s.value));
 
   // if the clock moves on past the chosen day or time, `day` or `slot` comes back empty and
@@ -105,8 +108,13 @@ export function BookingForm() {
     }
     const form = ev.currentTarget;
     const r = request();
+    const failed = () => setStatus({ kind: "failed", sms: smsHref(SHOP.phone.e164, smsBody()) });
+    // only bots fill in the hidden box: let them think it worked, and hold nothing
+    if ((form.elements.namedItem("botcheck") as HTMLInputElement | null)?.checked) {
+      setStatus({ kind: "sent", phone: r.phone.trim(), day: r.day, time: r.time });
+      return;
+    }
     setStatus({ kind: "sending" });
-    const honeypot = (form.elements.namedItem("botcheck") as HTMLInputElement | null)?.checked ?? false;
 
     // hold a place at the time first, so it can't fill up while the email goes out
     let hold: Hold = { checked: false };
@@ -115,32 +123,50 @@ export function BookingForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ day: dayIso, time, name: r.name, phone: r.phone, service: r.service }),
+        signal: AbortSignal.timeout(12_000),
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 409 || data.reason === "unavailable") {
-        // taken (or passed) since the page loaded: ask for another time
+        // full (or passed) since the page loaded: ask for another time, or another day if
+        // that was the day's last open time
+        const key = slotKey(dayIso, time);
+        const nextRefused = new Set(refused).add(key);
+        setRefused(nextRefused);
+        await loadFull();
+        const dayGone = slots.every((s) => s.value === time || nextRefused.has(slotKey(dayIso, s.value)) || full.has(slotKey(dayIso, s.value)));
         setStatus({ kind: "idle" });
         setTime("");
-        setErrors({ time: C.taken });
-        await loadFull();
-        requestAnimationFrame(() => form.querySelector<HTMLElement>('[data-field="time"]')?.focus());
+        if (dayGone) setDayIso("");
+        const message = res.status === 409 ? (dayGone ? C.dayTaken : C.taken) : C.passed;
+        setErrors(dayGone ? { day: message } : { time: message });
+        requestAnimationFrame(() => form.querySelector<HTMLElement>(`[data-field="${dayGone ? "day" : "time"}"]`)?.focus());
         return;
       }
+      if (res.status === 429) return failed();
       if (res.ok && data.ok) hold = data;
     } catch {
-      // the check couldn't be reached: send the booking anyway, marked unchecked
+      // the check couldn't be reached in time: send the booking anyway, marked unchecked
     }
     const freeLink = hold.checked && hold.slot && hold.id && hold.sig ? `${window.location.origin}/cancel?${new URLSearchParams({ slot: hold.slot, id: hold.id, sig: hold.sig })}` : "";
 
+    const sendHold = (path: string) =>
+      hold.id &&
+      fetch(path, {
+        method: "POST",
+        keepalive: true,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slot: hold.slot, id: hold.id, sig: hold.sig }),
+      }).catch(() => {});
+
+    let res: Response;
     try {
-      const res = await fetch(BOOKING.endpoint + BOOKING.email, {
+      res = await fetch(BOOKING.endpoint + BOOKING.email, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
+        signal: AbortSignal.timeout(20_000),
         body: JSON.stringify({
           _subject: `Appointment request: ${r.service}, ${r.day} at ${r.time}`,
           _template: "table",
-          // FormSubmit drops anything with this filled in, which only bots do
-          _honey: honeypot ? "on" : "",
           Service: r.service,
           Vehicle: r.vehicle,
           "Tire size": r.size.toUpperCase() || "Not given",
@@ -155,24 +181,23 @@ export function BookingForm() {
           ...(freeLink ? { [C.freeLink]: freeLink } : { [C.uncheckedLabel]: C.unchecked }),
         }),
       });
-      // FormSubmit answers {"success": "true"} as a string, and "false" (with a message)
-      // when the request wasn't delivered, as before the address has been activated
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || String(data.success) !== "true") throw new Error(data.message || `HTTP ${res.status}`);
-      setStatus({ kind: "sent", phone: r.phone.trim(), day: r.day, time: r.time });
-      void loadFull();
     } catch {
-      // the shop never got it, so don't keep the place
-      if (hold.id) {
-        void fetch("/api/release", {
-          method: "POST",
-          keepalive: true,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ slot: hold.slot, id: hold.id, sig: hold.sig }),
-        }).catch(() => {});
-      }
-      setStatus({ kind: "failed", sms: smsHref(SHOP.phone.e164, smsBody()) });
+      // no answer (offline, or it took too long): the email may or may not have gone out, so
+      // the held place is left to lapse on its own instead of being freed now
+      return failed();
     }
+    // FormSubmit answers {"success": "true"} as a string, and "false" (with a message) when
+    // the request wasn't delivered, as before the address has been activated
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || String(data.success) !== "true") {
+      // the shop didn't get it, so don't keep the place
+      void sendHold("/api/release");
+      return failed();
+    }
+    // the email went out: keep the place for good
+    void sendHold("/api/confirm");
+    setStatus({ kind: "sent", phone: r.phone.trim(), day: r.day, time: r.time });
+    void loadFull();
   };
 
   const reset = () => {

@@ -28,7 +28,8 @@ if (OPEN_URL) {
     await confirm.first().click();
     await page.waitForLoadState("load");
   }
-  console.log("Opened the link. The page says:\n" + (await page.innerText("body")).slice(0, 1500));
+  // the log is public, so only the gist of the page
+  console.log("Opened the link. The page says: " + (await page.innerText("body")).replace(/\s+/g, " ").slice(0, 200));
   await browser.close();
   process.exit(0);
 }
@@ -54,16 +55,22 @@ async function attempt() {
   await page.locator('[data-field="name"]').fill("Website test");
   await page.locator('[data-field="phone"]').fill("(910) 555-0100");
   await page.getByLabel("Anything else").fill("This is a test booking sent by the website check. Please ignore it.");
+  let sent = false;
+  const onRequest = (req) => {
+    if (FORM_SERVICE.test(req.url())) sent = true;
+  };
+  page.on("request", onRequest);
   const replied = page
-    .waitForResponse((res) => FORM_SERVICE.test(res.url()), { timeout: 20_000 })
+    .waitForResponse((res) => FORM_SERVICE.test(res.url()), { timeout: 30_000 })
     .then(async (res) => ({ status: res.status(), body: await res.text().catch(() => "") }))
     .catch(() => null);
   await page.locator('form button[type="submit"]').click();
 
   const reply = await replied;
+  page.off("request", onRequest);
   await page.locator(".bk__result").waitFor({ timeout: 20_000 }).catch(() => {});
   const shown = (await page.locator(".bk__result").innerText().catch(() => "")).replace(/\s+/g, " ").trim();
-  return { reply, shown };
+  return { reply, shown, sent };
 }
 
 const deadline = Date.now() + Number(WAIT_MINUTES) * 60_000;
@@ -71,6 +78,12 @@ let result;
 for (;;) {
   result = await attempt();
   if (result.reply) break;
+  // a booking went out but no answer came back: don't send another and risk a second email
+  if (result.sent) {
+    console.log(`::error::The booking was sent to FormSubmit but no answer came back. The page showed: ${result.shown || "(nothing)"}`);
+    await browser.close();
+    process.exit(1);
+  }
   if (Date.now() > deadline) {
     console.log(`::error::Gave up: the page never sent the booking to FormSubmit. It showed: ${result.shown || "(nothing)"}`);
     await browser.close();

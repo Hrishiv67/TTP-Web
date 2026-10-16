@@ -9,7 +9,12 @@ import { openDays, slotsFor } from "../lib/booking.ts";
 
 const SITE = process.env.SITE || "https://truck-tire-pro.vercel.app";
 const json = { "Content-Type": "application/json" };
-const fullTimes = async () => (await (await fetch(`${SITE}/api/slots?check=${Date.now()}`, { cache: "no-store" })).json());
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// the server keeps its answer for 3 seconds, so wait that out before each read
+const fullTimes = async () => {
+  await sleep(3500);
+  return (await fetch(`${SITE}/api/slots?check=${Date.now()}`, { cache: "no-store" })).json();
+};
 const fail = (msg) => {
   console.log(`::error::${msg}`);
   process.exitCode = 1;
@@ -51,6 +56,13 @@ try {
   const during = await fullTimes();
   if (!during.full.includes(key)) fail("The time didn't show as full.");
   else console.log("The time shows as full.");
+
+  // a confirmed hold (the booking email went out) stays until it's freed
+  if (holds[0]) {
+    const res = await fetch(`${SITE}/api/confirm`, { method: "POST", headers: json, body: JSON.stringify(holds[0]) });
+    if (!res.ok) fail(`Confirming a hold answered ${res.status}.`);
+    else console.log("Confirming a hold works.");
+  }
 } finally {
   for (const h of holds) {
     const res = await fetch(`${SITE}/api/release`, { method: "POST", headers: json, body: JSON.stringify(h) });

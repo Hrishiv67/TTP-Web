@@ -11,22 +11,50 @@ export type SlotKey = string;
 export const slotKey = (dayIso: string, time: string): SlotKey => `${dayIso}T${time}`;
 export const isSlotKey = (s: unknown): s is SlotKey => typeof s === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s);
 
-export type Booking = { id: string; name: string; phone: string; service: string; at: string };
+export type Booking = {
+  id: string;
+  name: string;
+  phone: string;
+  service: string;
+  at: string;
+  /** a hash of the visitor's address, to cap how many places one visitor can hold */
+  visitor?: string;
+  /**
+   * Set while the booking email goes out: the place lapses at this time unless the page
+   * confirms the email was sent, so a closed tab or a lost email can't keep it forever.
+   */
+  until?: string;
+};
 export type Ledger = { slots: Record<SlotKey, Booking[]> };
 
+/** How long a place is held while the booking email goes out. */
+export const HOLD_MINUTES = 15;
+
+/** A booking still counts unless it was a hold that lapsed. */
+export const isLive = (b: Booking, now: number) => !b.until || Date.parse(b.until) > now;
+const liveIn = (list: Booking[] | undefined, now: number) => (list ?? []).filter((b) => isLive(b, now));
+
 /** Times that already have `capacity` bookings. */
-export function fullSlots(ledger: Ledger, capacity: number): SlotKey[] {
+export function fullSlots(ledger: Ledger, capacity: number, now = Date.now()): SlotKey[] {
   return Object.entries(ledger.slots)
-    .filter(([, list]) => list.length >= capacity)
+    .filter(([, list]) => liveIn(list, now).length >= capacity)
     .map(([key]) => key)
     .sort();
 }
 
-/** Drops days before `todayIso`, so the file only ever holds upcoming bookings. */
-export function prune(ledger: Ledger, todayIso: string): boolean {
+/** How many places one visitor holds right now. */
+export function visitorCount(ledger: Ledger, visitor: string, now = Date.now()): number {
+  return Object.values(ledger.slots).reduce((n, list) => n + liveIn(list, now).filter((b) => b.visitor === visitor).length, 0);
+}
+
+/** Drops days before `todayIso` and lapsed holds, so the file only holds what still counts. */
+export function prune(ledger: Ledger, todayIso: string, now = Date.now()): boolean {
   let changed = false;
   for (const key of Object.keys(ledger.slots)) {
-    if (key.slice(0, 10) < todayIso || !ledger.slots[key].length) {
+    const kept = key.slice(0, 10) < todayIso ? [] : liveIn(ledger.slots[key], now);
+    if (kept.length !== ledger.slots[key].length) changed = true;
+    if (kept.length) ledger.slots[key] = kept;
+    else {
       delete ledger.slots[key];
       changed = true;
     }
@@ -34,12 +62,25 @@ export function prune(ledger: Ledger, todayIso: string): boolean {
   return changed;
 }
 
-/** Adds a booking if the time has room. */
-export function addBooking(ledger: Ledger, key: SlotKey, booking: Booking, capacity: number): boolean {
+/**
+ * Adds a booking if the time has room. Adding the same booking (same id) twice is a no-op
+ * that still answers yes, so a save retried after it actually went through can't double it.
+ */
+export function addBooking(ledger: Ledger, key: SlotKey, booking: Booking, capacity: number, now = Date.now()): boolean {
   const list = (ledger.slots[key] ??= []);
-  if (list.length >= capacity) return false;
+  if (list.some((b) => b.id === booking.id)) return true;
+  if (liveIn(list, now).length >= capacity) return false;
   list.push(booking);
   return true;
+}
+
+/** The booking email went out: keep the place for good. False if the booking isn't there. */
+export function confirmBooking(ledger: Ledger, key: SlotKey, id: string): { found: boolean; changed: boolean } {
+  const b = ledger.slots[key]?.find((x) => x.id === id);
+  if (!b) return { found: false, changed: false };
+  if (!b.until) return { found: true, changed: false };
+  delete b.until;
+  return { found: true, changed: true };
 }
 
 /** Removes a booking; false if it wasn't there (already freed, or the day has passed). */
